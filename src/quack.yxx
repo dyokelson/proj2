@@ -20,6 +20,7 @@
 
 }
 
+
 %locations
   /* %define parse.trace --- can't do this and also --debug on command line */
 
@@ -132,9 +133,10 @@ pgm:	classes  statements
         ;
 
 /* Zero or more classes;
- *   starter code limits it to zero classes.
+ *
  */
-classes:   /* empty */      {  $$ = new AST::Classes(); }
+classes:   classes class
+|          /* empty */      {  $$ = new AST::Classes(); }
        ;
 
 /* Zero or more statements 
@@ -153,6 +155,38 @@ statement_block: '{' statements '}'
   ;
 
 /* *************************************
+ * Class Structure
+ * *************************************
+ */
+class: class_sig class_body
+  ;
+
+class_sig: CLASS ident '(' formal_args_delim ')' EXTENDS ident
+         |  CLASS ident '(' formal_args_delim ')'
+         ;
+
+formal_args_delim: formal_args_delim ',' formal_arg
+                 |     formal_arg
+                 ;
+
+formal_args_opt: formal_args_delim
+               | /* empty */
+
+formal_arg: ident ':' ident
+
+class_body: '{' statements methods '}'
+
+/* *************************************
+ * Method Structure
+ * *************************************
+ */
+methods: methods method
+       | /* empty */
+
+method: 'def' ident '(' formal_args_delim ')' ':' ident statement_block
+      | 'def' ident '(' formal_args_delim ')' statement_block
+
+/* *************************************
  * Statements: Control structure
  * *************************************
  */ 
@@ -168,6 +202,10 @@ statement_block: '{' statements '}'
 
 statement: IF expr statement_block  opt_elif_parts
 	       { $$ = new AST::If(*$2, *$3, *$4); }
+
+	     | WHILE expr statement_block
+	       { $$ = new AST::While(*$2, *$3); }
+	     | expr ';'
 	     ;
 
 opt_elif_parts:  ELIF expr statement_block  opt_elif_parts
@@ -206,7 +244,8 @@ statement: l_expr ':' ident '=' expr ';'
  *    Fields of the current object, this.x = expr; 
  *    Methods of any object, (3+4).PRINT, sqr.translate(1,1).translate
  */ 
-l_expr: IDENT { $$ =  new AST::Ident($1); } ;
+l_expr: IDENT { $$ =  new AST::Ident($1); }
+      ;
 
 
 /* *************************************
@@ -236,6 +275,7 @@ expr: STRING_LIT { $$ = new AST::StrConst($1); }
  * desugaring:  Abstract syntax is method calls. 
  */
 expr:  expr '*' expr   { $$ = AST::Call::binop("TIMES", *$1, *$3); }
+    | expr '/' expr    { $$ = AST::Call::binop("DIVIDE", *$1, *$3; }
     |  expr '+' expr   { $$ = AST::Call::binop("PLUS", *$1, *$3); }
     |  expr '-' expr   { $$ = AST::Call::binop("MINUS", *$1, *$3); }
     |  '-' expr  %prec NEG  {
@@ -243,8 +283,16 @@ expr:  expr '*' expr   { $$ = AST::Call::binop("TIMES", *$1, *$3); }
                               $$ = AST::Call::binop("MINUS", *zero, *$2);
                             }
     /* Comparisons */
+    | expr EQUALS   expr     { $$ = new AST::Equals(*$1, *$3); }
+    | expr ATLEAST   expr     { $$ = new AST::Atleast(*$1, *$3); }
+    | expr ATMOST   expr     { $$ = new AST::Atmost(*$1, *$3); }
+    | expr '<'   expr     { $$ = new AST::Less(*$1, *$3); }
+    | expr '>'   expr     { $$ = new AST::Greater(*$1, *$3); }
+
     /* Boolean expressions are NOT syntactic sugar */
     | expr AND   expr     { $$ = new AST::And(*$1, *$3); }
+    | expr OR   expr     { $$ = new AST::Or(*$1, *$3); }
+    | expr NOT   expr     { $$ = new AST::Not(*$1, *$3); }
     ;
 
 
