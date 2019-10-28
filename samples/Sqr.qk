@@ -41,5 +41,6 @@ class Square(ll: Pt, side: Int) extends Rect {
 }
   
 a_square = Square( Pt(3,3), 5 );
-a_square = a_square.translate( Pt(2,2) );
+Square(Pt(2,1), 5);
 a_square.PRINT();
+a_square = a_square.translate( Pt(2,2) );
