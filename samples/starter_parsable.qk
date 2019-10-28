@@ -4,7 +4,7 @@
  * one.
  */
 
-if  true {
+if true {
      x = 42;
 } else {
      x = 19;  // This should never happen
