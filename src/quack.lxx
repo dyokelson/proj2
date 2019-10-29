@@ -145,25 +145,25 @@ not      { return parser::token::NOT; }
 <QQQ>\"\"\"  { yylval.str = strdup(string_buf.c_str()); string_buf = ""; start(INITIAL); return parser::token::STRING_LIT; }
 
 /* Unexpected EOF */
-<Q,QQQ><<EOF>> { echo(); start(INITIAL); report::error(BAD_EOF_STR + " at line " + std::to_string(lineno())
+<Q,QQQ><<EOF>> { start(INITIAL); report::error(BAD_EOF_STR + " at line " + std::to_string(lineno())
                                            + ", column " + std::to_string(columno()));  }
 
 /* Single Quotes only allows some escaped chars */
-<Q>[\\][0btnrf\"\\] { echo(); string_buf += text(); }
-<Q>[\\]. { echo(); report::error(BAD_ESC_MSG + " at line " + std::to_string(lineno())
+<Q>[\\][0btnrf\"\\] { string_buf += text(); }
+<Q>[\\]. { report::error(BAD_ESC_MSG + " at line " + std::to_string(lineno())
                     + ", column " + std::to_string(columno()));}
 
 /* Only triple-quoted strings can gobble unescaped newlines.
  *  (Note the wild-card character '.' does not match newline)
  */
-<Q>\n   {echo(); report::error(BAD_NL_STR + " at line " + std::to_string(lineno())
+<Q>\n   {report::error(BAD_NL_STR + " at line " + std::to_string(lineno())
                   + ", column " + std::to_string(columno()));}
-<QQQ>\n  { echo(); string_buf += text(); }
+<QQQ>\n  { string_buf += text(); }
 
 /* They gobble anything else. We do it one character at a time so that
  * we don't have to make exceptions for the quote marks.
  */
-<Q,QQQ>.  { echo(); string_buf += text(); }
+<Q,QQQ>.  { string_buf += text(); }
 
 .  {   report::error("Unexpected character " + std::string(text()) + " at line " + std::to_string(lineno()) +
        ", column " + std::to_string(columno()));
