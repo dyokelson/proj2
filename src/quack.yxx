@@ -173,7 +173,7 @@ statement_block: '{' statements '}'
  */
 
 clas: CLASS ident '(' formal_args ')' opt_cls_extends '{' statements methods '}'
-               { $$ = new AST::Class(*$2, *$6, *(new AST::Method(*$2, *$4, *(new AST::Ident("Nothing")), *$8)), *$9); debug($$);}
+               { $$ = new AST::Class(*$2, *$6, *(new AST::Method(*$2, *$4, *(new AST::Ident("Nothing")), *$8)), *$9); }
                ;
 
 opt_cls_extends: EXTENDS ident { $$ = new AST::Ident(*$2); }
@@ -381,7 +381,7 @@ type_alt: ident ':' ident statement_block
  * *************************************
  */
 
-ident: IDENT { $$ = new AST::Ident($1); debug($$); } ;
+ident: IDENT { $$ = new AST::Ident($1); } ;
 
 %%
 
