@@ -104,23 +104,30 @@ class StaticSemantics {
             // build class hierarchy
             build_class_hierarchy(root);
             // check vars are initialized - if error stop
-            check_init(root);
-            // if error
+            if (error) {
+                return nullptr;
+            } else {
+                check_init(root);
+            }
             // type inference
-            type_inference(root); // do this to the methods within a class, topologically because of instance variables
-            // make sure not doing anything that doesn't fit that type of instance variables - also trying to do something wrong just within the method
-            //type inference for a method gets a block of statements, with list of local variables
-            // everything starts at bottom - did anything change? pseudo code
-            // pass a context that holds variables, and a flag to say if changed or not
-            // add to the context as things change (recursive walk of the tree)
-            // create a pseudo class (maybe) type inference can be done on a fake class or not, method inference with no context, no instance variables
-            // if no errors
-            //if (error == true) {
-            //    return nullptr;
-            // }
-            //else {
+            if (error) {
+                return nullptr;
+            } else {
+                type_inference(root);
+                // do this to the methods within a class, topologically because of instance variables
+                // make sure not doing anything that doesn't fit that type of instance variables - also trying to do something wrong just within the method
+                //type inference for a method gets a block of statements, with list of local variables
+                // everything starts at bottom - did anything change? pseudo code
+                // pass a context that holds variables, and a flag to say if changed or not
+                // add to the context as things change (recursive walk of the tree)
+                // create a pseudo class (maybe) type inference can be done on a fake class or not, method inference with no context, no instance variables
+            }
+            if (error) {
+                return nullptr;
+            }
+
             return &tp;
-            //}
+
 
     };
 
@@ -132,9 +139,8 @@ class StaticSemantics {
         AST::Classes classes = root_node->classes_;
         vector<AST::Class *> class_list = classes.elements_;
         for (AST::Class *clazz: class_list) {
-            // first pass just builds the classes - not check to see if they're already there
-            // cycles or anything that "extends" that isn't there (2nd pass)
-            // Obj just doesn't have a parent
+            // first pass just builds the classes as is
+            // Obj just doesn't have a parent (taken care of in parser)
             string cls_name = (*clazz).name_.text_;
             ClassNode new_class = ClassNode(cls_name);
             // populate all the things!
@@ -149,7 +155,7 @@ class StaticSemantics {
             }
             class_hierarchy[cls_name] = new_class;
         }
-        // now go through the class_hierarchy again and check for cycles and extends
+        // now go through the class_hierarchy again and check for cycles and nonexistent parents
 
     }
 
