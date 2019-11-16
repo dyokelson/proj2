@@ -6,6 +6,7 @@
 #include "lex.yy.h"
 #include "ASTNode.h"
 #include "Messages.h"
+#include "staticsemantics.cpp"
 
 #include <iostream>
 #include <unistd.h>  // getopt is here
@@ -68,6 +69,15 @@ int main(int argc, char **argv) {
             AST::AST_print_context context;
             root->json(std::cout, context);
             std::cout << std::endl;
+            // call static semantic checker, pass in root
+            // get a struct full of pointers to tables in return
+            StaticSemantics ssc(root);
+            tablepointers *result = ssc.check(root);
+            if (result == nullptr ) {
+                std::cout << "Error while doing static semantic check." << std::endl;
+            } else {
+                std::cout << "Success with the static semantics!!." << std::endl;
+            }
         } else {
             std::cout << "No tree produced." << std::endl;
         }

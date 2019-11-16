@@ -59,10 +59,11 @@ namespace AST {
      */
     template<class Kind>
     class Seq : public ASTNode {
-    protected:
+    //protected:
+    public:
         std::string kind_;
         std::vector<Kind *> elements_;
-    public:
+
         Seq(std::string kind) : kind_{kind}, elements_{std::vector<Kind *>()} {}
 
         void append(Kind *el) { elements_.push_back(el); }
@@ -105,8 +106,10 @@ namespace AST {
     * store something in it).
     */
     class Ident : public LExpr {
-        std::string text_;
     public:
+
+        std::string text_;
+
         explicit Ident(std::string txt) : text_{txt} {}
         void json(std::ostream& out, AST_print_context& ctx) override;
     };
@@ -127,9 +130,11 @@ namespace AST {
      * identifier: type pairs.
      */
     class Formal : public ASTNode {
+    public:
+
         ASTNode& var_;
         ASTNode& type_;
-    public:
+
         explicit Formal(ASTNode& var, ASTNode& type_) :
             var_{var}, type_{type_} {};
         void json(std::ostream& out, AST_print_context&ctx) override;
@@ -141,11 +146,13 @@ namespace AST {
     };
 
     class Method : public ASTNode {
+    public:
+
         ASTNode& name_;
         Formals& formals_;
         ASTNode& returns_;
         Block& statements_;
-    public:
+
         explicit Method(ASTNode& name, Formals& formals, ASTNode& returns, Block& statements) :
           name_{name}, formals_{formals}, returns_{returns}, statements_{statements} {}
         void json(std::ostream& out, AST_print_context&ctx) override;
@@ -243,11 +250,13 @@ namespace AST {
     * and a list of methods.
     */
     class Class : public ASTNode {
+    public:
+
         Ident& name_;
         Ident& super_;
         ASTNode& constructor_;
         Methods& methods_;
-    public:
+
         explicit Class(Ident& name, Ident& super,
                  ASTNode& constructor, Methods& methods) :
             name_{name},  super_{super},
