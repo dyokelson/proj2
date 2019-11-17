@@ -3,6 +3,7 @@
 //
 
 //#include "staticsemantics.h"
+#include <iostream>
 #include <map>
 #include <vector>
 #include "ASTNode.h"
@@ -46,7 +47,7 @@ class ClassNode {
         // attributes of the class (vars, methods)
         // type check the constructor before the methods
             // needs to initialize the same types as inherited class
-        vector<string> instance_vars; // names of the variables,
+        map<string, string> instance_vars; // names of the variables,
         vector<MethodNode*> methods;
         // constructor
         MethodNode constructor;
@@ -58,17 +59,13 @@ class ClassNode {
         ClassNode(string name) { // constructor takes a name
             name = name;
             parent = "";
-            instance_vars = vector<string>();
+            instance_vars = map<string, string>();
             methods = vector<MethodNode*>();
         }
 
         // TODO do I need all these or should I just access the public fields and push later?
         void add_parent(string parent) {
             parent = parent;
-        }
-
-        void add_inst_var(string inst_var) {
-            instance_vars.push_back(inst_var);
         }
 
         void add_method(MethodNode* method) {
@@ -89,7 +86,7 @@ class StaticSemantics {
     map<string, ClassNode> class_hierarchy;
     // hashtable for variables and types - scopes!
     map<string, string> var_types;
-    // indicates an error occurred during static semantics check and should return nullptr
+    // indicates an error occurred sometime during static semantics check and should return nullptr
     bool error = false;
 
     public:
@@ -100,10 +97,11 @@ class StaticSemantics {
 
         // this method takes the AST as input and returns a struct of pointers to the two tables
         tablepointers *check(AST::ASTNode *root) { // TODO this doesn't need to take the root passed in anymore
-            // can stop if I find any error in any of these steps at least for now
+
             // build class hierarchy
             build_class_hierarchy(root);
-            // check vars are initialized - if error stop
+
+            // check vars are initialized
             if (error) {
                 return nullptr;
             } else {
@@ -143,11 +141,15 @@ class StaticSemantics {
             // Obj just doesn't have a parent (taken care of in parser)
             string cls_name = (*clazz).name_.text_;
             ClassNode new_class = ClassNode(cls_name);
+
             // populate all the things!
             new_class.parent = clazz->super_.text_;
+
             AST::ASTNode *constr = &clazz->constructor_;
             AST::Method *construct = (AST::Method*) constr;
             new_class.constructor = MethodNode(construct);
+            new_class.instance_vars = new_class.constructor.local_vars; //constructors variables are the class level - need this?
+
             vector<AST::Method *> method_list = clazz->methods_.elements_;
             for (AST::Method *method: method_list) {
                 MethodNode new_method = MethodNode(method);
@@ -156,14 +158,26 @@ class StaticSemantics {
             class_hierarchy[cls_name] = new_class;
         }
         // now go through the class_hierarchy again and check for cycles and nonexistent parents
+        map<std::string, ClassNode>::iterator it = class_hierarchy.begin();
+        while (it != class_hierarchy.end())
+        {
+            ClassNode cur_class = it->second;
+            string cur_par = cur_class.parent;
+            if (cur_par == "Obj" || class_hierarchy.count(cur_par)) {
+                // everything exists! TODO now check for cycles (by sorting topologically?)
 
+            } else {
+                std::cout << " Class " +cur_class.name + " extends undefined class " + cur_par;
+            }
+        }
     }
 
     void check_init(AST::ASTNode *root) {
 
     }
 
-    // update the this.var_types table
+    //maybe move this inside class or inside method? a method can infer itself??
+    // do type inference per method!!! can reuse this method with statements after class definitions
     void type_inference(AST::ASTNode *root) {
 
     }
