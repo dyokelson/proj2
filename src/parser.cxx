@@ -72,6 +72,7 @@ int main(int argc, char **argv) {
             // call static semantic checker, pass in root
             // get a struct full of pointers to tables in return
             StaticSemantics ssc(root);
+            // std::cout << "About to call the static semantic checker." << std::flush;
             tablepointers *result = ssc.check(root);
             if (result == nullptr ) {
                 std::cout << "Error while doing static semantic check." << std::endl;

@@ -6,6 +6,9 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include <stack>
+#include <list>
+#include "string.h"
 #include "ASTNode.h"
 
 using namespace std;
@@ -23,7 +26,9 @@ public:
     }
 
     MethodNode(AST::Method *method) {
-        name = method->name_.str();
+        //AST::Ident name_node = (AST::Ident) method->name_;
+        name = method->name_.text_;
+
         return_type = method->returns_.str();
         local_vars = map<string, string>();
 
@@ -34,16 +39,17 @@ public:
                 local_vars[formal->var_.str()] = formal->type_.str();
             }
         }
-
+        std::cout << " Method " + this->name + " created \n" << std::flush;
     }
+
 };
 
 // okay to build with minimal information now, as long as do a type inference/check topologically
 class ClassNode {
     public:
-        string name;
+        string name_;
         // keep track of parents and children for the class hierarchy
-        string parent;
+        string parent_;
         // attributes of the class (vars, methods)
         // type check the constructor before the methods
             // needs to initialize the same types as inherited class
@@ -51,16 +57,21 @@ class ClassNode {
         vector<MethodNode*> methods;
         // constructor
         MethodNode constructor;
+        bool visited;
+        bool resolved;
 
         ClassNode() {
 
         }
 
-        ClassNode(string name) { // constructor takes a name
-            name = name;
-            parent = "";
-            instance_vars = map<string, string>();
-            methods = vector<MethodNode*>();
+        //explicit ClassNode(string name, string parent):  name_{string::strdup(name)}, parent_{string::strdup(parent)}{ // constructor takes a name
+        ClassNode(string name, string parent) {
+            name_ = name;
+            parent_ = parent;
+            visited = false;
+            resolved = false;
+            this ->instance_vars = map<string, string>();
+            this->methods = vector<MethodNode*>();
         }
 
         // TODO do I need all these or should I just access the public fields and push later?
@@ -75,7 +86,7 @@ class ClassNode {
 
 //struct for returning from the check() method
 struct tablepointers {
-    map<string, ClassNode> *class_hierarchy;
+    map<string, ClassNode> class_hierarchy;
     map<string, string> *var_types;
 };
 
@@ -83,54 +94,83 @@ class StaticSemantics {
 
     tablepointers tp;
     // hashtable for class hierarchy
-    map<string, ClassNode> class_hierarchy;
+    map <string, ClassNode*> class_hierarchy;
+    // once sorted
+    vector <ClassNode*> sorted_classes;
     // hashtable for variables and types - scopes!
-    map<string, string> var_types;
+    map <string, string> var_types;
     // indicates an error occurred sometime during static semantics check and should return nullptr
     bool error = false;
 
-    public:
-        StaticSemantics(AST::ASTNode *root) { // default constructor
-            root = root;
-            class_hierarchy = map<string, ClassNode>();
+public:
+    StaticSemantics(AST::ASTNode *root) { // default constructor
+        root = root;
+        class_hierarchy = map<string, ClassNode*>();
+        sorted_classes = vector<ClassNode*>();
+        var_types = map<string, string>();
+    }
+    // A recursive function used by topologicalSort
+    void topologicalSortRec(ClassNode* cn)
+    {
+        if (cn->resolved) {
+            return;
+        }
+        if (cn->visited) {
+            std::cout << " Class " <<cn->name_ << " in a cycle with " << cn->parent_ << endl;
+            error = true;
+            return;
+        }
+        cn->visited = true;
+        string cur_parent = cn->parent_;
+        string cur_class = cn->name_;
+        std::cout << "PARENT CLASS " << cur_parent << std::flush << endl;
+        if (class_hierarchy.count(cur_parent)) {
+            topologicalSortRec(class_hierarchy[cur_parent]);
+            sorted_classes.push_back(cn);
+            cn->resolved = true;
+        } else {
+            std::cout << " Class " << cur_class << " extends undefined class " << cur_parent<<endl;
+        }
+}
+
+
+    // this method takes the AST as input and returns a struct of pointers to the two tables
+    tablepointers *check(AST::ASTNode *root) { // TODO this doesn't need to take the root passed in anymore
+
+        // build class hierarchy
+        build_class_hierarchy(root);
+
+        // check vars are initialized
+        if (error) {
+            return nullptr;
+        } else {
+            check_init(root);
+        }
+        // type inference
+        if (error) {
+            return nullptr;
+        } else {
+            type_inference(root);
+            // do this to the methods within a class, topologically because of instance variables
+            // make sure not doing anything that doesn't fit that type of instance variables - also trying to do something wrong just within the method
+            //type inference for a method gets a block of statements, with list of local variables
+            // everything starts at bottom - did anything change? pseudo code
+            // pass a context that holds variables, and a flag to say if changed or not
+            // add to the context as things change (recursive walk of the tree)
+            // create a pseudo class (maybe) type inference can be done on a fake class or not, method inference with no context, no instance variables
+        }
+        if (error) {
+            return nullptr;
         }
 
-        // this method takes the AST as input and returns a struct of pointers to the two tables
-        tablepointers *check(AST::ASTNode *root) { // TODO this doesn't need to take the root passed in anymore
-
-            // build class hierarchy
-            build_class_hierarchy(root);
-
-            // check vars are initialized
-            if (error) {
-                return nullptr;
-            } else {
-                check_init(root);
-            }
-            // type inference
-            if (error) {
-                return nullptr;
-            } else {
-                type_inference(root);
-                // do this to the methods within a class, topologically because of instance variables
-                // make sure not doing anything that doesn't fit that type of instance variables - also trying to do something wrong just within the method
-                //type inference for a method gets a block of statements, with list of local variables
-                // everything starts at bottom - did anything change? pseudo code
-                // pass a context that holds variables, and a flag to say if changed or not
-                // add to the context as things change (recursive walk of the tree)
-                // create a pseudo class (maybe) type inference can be done on a fake class or not, method inference with no context, no instance variables
-            }
-            if (error) {
-                return nullptr;
-            }
-
-            return &tp;
+        return &tp;
 
 
     };
 
     // update the class_hierarchy table
     void build_class_hierarchy(AST::ASTNode *root) {
+        std::cout << "Building Class Hierarchy \n" << std::flush;
         // cast root to a Program node
         AST::Program *root_node = (AST::Program*) root;
         // get the classes
@@ -138,14 +178,14 @@ class StaticSemantics {
         vector<AST::Class *> class_list = classes.elements_;
         for (AST::Class *clazz: class_list) {
             // first pass just builds the classes as is
-            // Obj just doesn't have a parent (taken care of in parser)
-            string cls_name = (*clazz).name_.text_;
-            ClassNode new_class = ClassNode(cls_name);
+            //string cls_name = clazz->name_.text_;
+            //string par_name = clazz->super_.text_;
+            //std::cout << " Class and PAR " << cls_name << par_name <<endl;
+            //ClassNode new_class = ClassNode(cls_name, par_name);
+            ClassNode new_class = ClassNode(clazz->name_.text_, clazz->super_.text_);
 
             // populate all the things!
-            new_class.parent = clazz->super_.text_;
-
-            AST::ASTNode *constr = &clazz->constructor_;
+            AST::ASTNode *constr = &(clazz->constructor_);
             AST::Method *construct = (AST::Method*) constr;
             new_class.constructor = MethodNode(construct);
             new_class.instance_vars = new_class.constructor.local_vars; //constructors variables are the class level - need this?
@@ -155,25 +195,41 @@ class StaticSemantics {
                 MethodNode new_method = MethodNode(method);
                 new_class.add_method(&new_method);
             }
-            class_hierarchy[cls_name] = new_class;
+            //std::cout << " Class " <<cls_name << " created class:" << new_class.name_<<"\n"<< std::flush;
+            for (std::pair<std::string, ClassNode*> element : class_hierarchy) {
+                std::cout << "11111 PRINTING OUT THE MAP: "<<element.first << " second " <<(element.second)->name_ << endl;
+            }
+            class_hierarchy[clazz->name_.text_] = &new_class;
         }
         // now go through the class_hierarchy again and check for cycles and nonexistent parents
-        map<std::string, ClassNode>::iterator it = class_hierarchy.begin();
-        while (it != class_hierarchy.end())
-        {
-            ClassNode cur_class = it->second;
-            string cur_par = cur_class.parent;
-            if (cur_par == "Obj" || class_hierarchy.count(cur_par)) {
-                // everything exists! TODO now check for cycles (by sorting topologically?)
+        //std::map<std::string, ClassNode>::iterator it = class_hierarchy.begin();
+        ClassNode obj_node = ClassNode("Obj", "None");
+        obj_node.visited = true;
+        obj_node.resolved = true;
+        class_hierarchy["Obj"] = &obj_node;
+        sorted_classes.push_back(&obj_node);
+        std::cout << "SORTING " << class_hierarchy.size() << " CLASSES\n" << std::flush;
+        for (std::pair<std::string, ClassNode*> element : class_hierarchy) {
+            std::cout << "PRINTING OUT THE MAP: "<<element.first << " second " <<(element.second)->name_ << endl;
+        }
 
-            } else {
-                std::cout << " Class " +cur_class.name + " extends undefined class " + cur_par;
-            }
+        for (std::pair<std::string, ClassNode*> element : class_hierarchy) {
+            ClassNode* cn = element.second;
+            std::cout << "SORTING CLASS '" << cn->name_ << "'" << std::flush <<endl ;
+            topologicalSortRec(cn);
+        }
+        int size = sorted_classes.size();
+        std::cout << size << " TOTAL SORTED CLASSES" <<endl;
+        for (int i = 0; i < sorted_classes.size(); i++) {
+            std::cout << (sorted_classes.at(i))->name_ << " ";
         }
     }
 
     void check_init(AST::ASTNode *root) {
+        // check the constructor of each class first (start at the top
+        // needs to initialize all variables from the classes it inherits
 
+        // check all methods
     }
 
     //maybe move this inside class or inside method? a method can infer itself??

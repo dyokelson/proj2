@@ -148,12 +148,13 @@ namespace AST {
     class Method : public ASTNode {
     public:
 
-        ASTNode& name_;
+        //ASTNode& name_;
+        Ident& name_;
         Formals& formals_;
         ASTNode& returns_;
         Block& statements_;
 
-        explicit Method(ASTNode& name, Formals& formals, ASTNode& returns, Block& statements) :
+        explicit Method(Ident& name, Formals& formals, ASTNode& returns, Block& statements) :
           name_{name}, formals_{formals}, returns_{returns}, statements_{statements} {}
         void json(std::ostream& out, AST_print_context&ctx) override;
     };
