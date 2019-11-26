@@ -1,6 +1,6 @@
-## Dewi Yokelson - Project 2 Parser
+## Dewi Yokelson - Quack Compiler
 
-C++ (bison, re-flex) version of project 2, parser
+C++ (bison, re-flex) version of project 2, parser, extended to contain the full compiler.
 
 This uses my lexer from project 1
 
