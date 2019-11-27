@@ -120,7 +120,7 @@ public:
     void topologicalSortRec(ClassNode* cn)
     {
         if (cn->resolved) {
-            std::cout << " Found Resolved Class " <<cn->name_ << endl;
+            //std::cout << " Found Resolved Class " <<cn->name_ << endl;
             return;
         }
         if (cn->visited) {
@@ -232,8 +232,28 @@ public:
 
     void check_init(AST::ASTNode *root) {
         AST::Program *root_node = (AST::Program*) root;
-        set<string>  empty_vars;
-        int success = root_node->init_check(this, empty_vars);
+        set<string>  initial_vars;
+        initial_vars.insert("Nothing");
+        initial_vars.insert("none");
+        initial_vars.insert("true");
+        initial_vars.insert("false");
+        initial_vars.insert("Int");
+        initial_vars.insert("Boolean");
+        initial_vars.insert("String");
+        initial_vars.insert("Obj");
+        initial_vars.insert("this");
+        initial_vars.insert("PLUS");
+        initial_vars.insert("MINUS");
+        initial_vars.insert("TIMES");
+        initial_vars.insert("DIVIDE");
+        initial_vars.insert("PRINT");
+        initial_vars.insert("EQUALS");
+        initial_vars.insert("ATMOST");
+        initial_vars.insert("<");
+        initial_vars.insert("ATLEAST");
+        initial_vars.insert(">");
+
+        int success = root_node->init_check(this, &initial_vars);
         if (success) {
             std::cout << "Success with initialization check!";
         } else {
@@ -241,7 +261,6 @@ public:
         }
     }
 
-    //maybe move this inside class or inside method? a method can infer itself??
     // do type inference per method!!! can reuse this method with statements after class definitions
     void type_inference(AST::ASTNode *root) {
         // do this to the methods within a class, topologically because of instance variables

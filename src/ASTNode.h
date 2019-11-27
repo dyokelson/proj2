@@ -37,7 +37,8 @@ namespace AST {
             json(ss, ctx);
             return ss.str();
         }
-        virtual int init_check(StaticSemantics *ss, std::set<std::string> vars) =0;
+        virtual int init_check(StaticSemantics *ss, std::set<std::string> *vars) =0;
+        virtual std::string get_text() = 0;
         //virtual std::string type_infer(StaticSemantics *ss, map<std::string, std::string>* context/*class and method thingy*/) = 0;
     protected:
         void json_indent(std::ostream& out, AST_print_context& ctx);
@@ -51,7 +52,8 @@ namespace AST {
     public:
         explicit Stub(std::string name) : name_{name} {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
 
@@ -89,11 +91,12 @@ namespace AST {
             out << "]";
             json_close(out, ctx);
         }
-//        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override {
+//        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override {
             //implement here instead of cpp file
             return 0;
         }
+        std::string get_text() override {return "";};
     };
 
     /* L_Expr nodes are AST nodes that can be evaluated for location.
@@ -125,7 +128,8 @@ namespace AST {
 
         explicit Ident(std::string txt) : text_{txt} {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override;
     };
 
 
@@ -146,13 +150,14 @@ namespace AST {
     class Formal : public ASTNode {
     public:
 
-        ASTNode& var_;
-        ASTNode& type_;
+        Ident& var_;
+        Ident& type_;
 
-        explicit Formal(ASTNode& var, ASTNode& type_) :
+        explicit Formal(Ident& var, Ident& type_) :
             var_{var}, type_{type_} {};
         void json(std::ostream& out, AST_print_context&ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
     class Formals : public Seq<Formal> {
@@ -172,7 +177,8 @@ namespace AST {
         explicit Method(Ident& name, Formals& formals, ASTNode& returns, Block& statements) :
           name_{name}, formals_{formals}, returns_{returns}, statements_{statements} {}
         void json(std::ostream& out, AST_print_context&ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
     class Methods : public Seq<Method> {
@@ -202,7 +208,8 @@ namespace AST {
         explicit Assign(ASTNode &lexpr, ASTNode &rexpr) :
            lexpr_{lexpr}, rexpr_{rexpr} {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
     class AssignDeclare : public Assign {
@@ -211,7 +218,8 @@ namespace AST {
         explicit AssignDeclare(ASTNode &lexpr, ASTNode &rexpr, Ident &static_type) :
             Assign(lexpr, rexpr), static_type_{static_type} {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
     /* A statement could be just an expression ... but
@@ -228,7 +236,8 @@ namespace AST {
     public:
         Load(LExpr &loc) : loc_{loc} {}
         void json(std::ostream &out, AST_print_context &ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
 
@@ -239,7 +248,8 @@ namespace AST {
         ASTNode &expr_;
         explicit Return(ASTNode& expr) : expr_{expr}  {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
     class If : public Statement {
@@ -250,7 +260,8 @@ namespace AST {
         explicit If(ASTNode& cond, Seq<ASTNode>& truepart, Seq<ASTNode>& falsepart) :
             cond_{cond}, truepart_{truepart}, falsepart_{falsepart} { };
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
     class While : public Statement {
@@ -260,7 +271,8 @@ namespace AST {
         explicit While(ASTNode& cond, Block& body) :
             cond_{cond}, body_{body} { };
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
 
@@ -283,7 +295,8 @@ namespace AST {
             name_{name},  super_{super},
             constructor_{constructor}, methods_{methods} {};
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
     /* A Quack program begins with a sequence of zero or more
@@ -299,7 +312,8 @@ namespace AST {
     public:
         explicit IntConst(int v) : value_{v} {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
     class Type_Alternative : public ASTNode {
@@ -310,7 +324,8 @@ namespace AST {
         explicit Type_Alternative(Ident& ident, Ident& classname, Block& block) :
                 ident_{ident}, classname_{classname}, block_{block} {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
     class Type_Alternatives : public Seq<Type_Alternative> {
@@ -325,7 +340,8 @@ namespace AST {
         explicit Typecase(Expr& expr, Type_Alternatives& cases) :
                 expr_{expr}, cases_{cases} {};
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
 
@@ -334,7 +350,8 @@ namespace AST {
     public:
         explicit StrConst(std::string v) : value_{v} {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
     class Actuals : public Seq<Expr> {
@@ -354,7 +371,8 @@ namespace AST {
         explicit Construct(Ident& method, Actuals& actuals) :
                 method_{method}, actuals_{actuals} {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
 
@@ -373,7 +391,8 @@ namespace AST {
         // created for a binary operator (+, -, etc).
         static Call* binop(std::string opname, Expr& receiver, Expr& arg);
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
 
@@ -396,14 +415,16 @@ namespace AST {
    public:
        explicit And(ASTNode& left, ASTNode& right) :
           BinOp("And", left, right) {}
-       int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+       int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+       std::string get_text() override {return "";};
    };
 
     class Or : public BinOp {
     public:
         explicit Or(ASTNode& left, ASTNode& right) :
                 BinOp("Or", left, right) {}
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
     class Not : public Expr {
@@ -412,7 +433,8 @@ namespace AST {
         explicit Not(ASTNode& left ):
             left_{left}  {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
 
@@ -430,7 +452,8 @@ namespace AST {
         explicit Dot (Expr& left, Ident& right) :
            left_{left},  right_{right} {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override;
     };
 
 
@@ -444,7 +467,8 @@ namespace AST {
         explicit Program(Classes& classes, Block& statements) :
                 classes_{classes}, statements_{statements} {}
         void json(std::ostream& out, AST_print_context& ctx) override;
-        int init_check(StaticSemantics *ss, std::set<std::string> vars) override;
+        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
+        std::string get_text() override {return "";};
     };
 
 

@@ -210,170 +210,238 @@ namespace AST {
     }
 
     /* IMPLEMENT ALL THE TYPE INITIALIZATION METHODS */
-    int Stub::init_check(StaticSemantics *ss, std::set<std::string> vars) {
+    int Stub::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
         return 0;
     }
 
     //template<>
-    //int Seq<ASTNode>::init_check(StaticSemantics *ss, std::set<std::string> vars) {}
+    //int Seq<ASTNode>::init_check(StaticSemantics *ss, std::set<std::string> *vars) {}
 
-    int Program::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        int result1;
-        int result2;
+    int Program::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
         // check initialization for each class in classes
         AST::Classes classes = this->classes_;
         vector < AST::Class * > class_list = classes.elements_;
         for (AST::Class *clazz: class_list) {
-            result1 = clazz->init_check(ss, vars);
+            std::cout << "Init Checking Class: " << clazz->name_.str() << endl;
+            int class_result = clazz->init_check(ss, vars);
+            if (!class_result) {
+                return 0;
+            }
         }
+        // bus error happening sometime above this
+        //exit(1);
         // check each statement in the statement block that comes after the classes
         AST::Block statements = this->statements_;
         vector < AST::ASTNode * > statement_list =  statements.elements_;
         for (AST::ASTNode *stmt: statement_list) {
-            result2 = stmt->init_check(ss, vars);
+            std::cout << "Init Checking Statement: " << stmt->str() << endl;
+            int stmt_result = stmt->init_check(ss, vars);
+            if (!stmt_result) {
+                return 0;
+            }
         }
-
-        if (result1 and result2) {
-            return 1;
-        } else {
-            return 0;
-        }
-
-    }
-
-    int Formal::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        // TODO don't add here? only add when I know it was a fully successful method?
-        string variable = this->var_.str();
-        vars.insert(variable);
         return 1;
     }
 
-    int Method::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        int fml_result;
-        int stmt_result;
-        // init check formals - add
+    int Formal::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        // TODO don't add here? only add when I know it was a fully successful method?
+        Ident formal_arg = this->var_;
+        string arg = formal_arg.text_;
+        std::cout << "Inserting formal arg: " << arg << endl;
+        vars->insert(arg);
+        return 1;
+    }
+
+    int Method::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        // init check formal args - add
+        //std::set<std::string>* method_args = new std::set<std::string>(*vars);
         for (Formal* fml : this->formals_.elements_) {
-            fml_result = fml->init_check(ss, vars);
+            int fml_result = fml->init_check(ss, vars);
+            if (!fml_result) {
+                std::cout << "Method Checking Results: Formal Arg Result: " << fml_result <<endl;
+                return 0;
+            }
         }
         // init check method body
         AST::Block statements = this->statements_;
         vector < AST::ASTNode * > statement_list =  statements.elements_;
         for (AST::ASTNode *stmt: statement_list) {
-            stmt_result = stmt->init_check(ss, vars);
+            int stmt_result = stmt->init_check(ss, vars);
+            if (!stmt_result) {
+                std::cout << "Method Checking Results: Statement Result: " << stmt_result<<endl;
+                return 0;
+            }
         }
         // init check return statement
         int return_result = this->returns_.init_check(ss, vars);
+        if (!return_result) {
+            std::cout << "Error in Method Checking Results: Return Result: " << return_result<<endl;
+            return 0;
+        }
         // add method name to the table if all was successful
-        vars.insert(this->name_.text_);
+        vars->insert(this->name_.text_);
         return 1;
+
     }
     /*  statement: l_expr '=' expr ';'
     { $$ = new AST::Assign(*$1, *$3); };*/
-    int Assign::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        // TODO does this initialize a variable?
-        int l_result = this->lexpr_.init_check(ss, vars);
+    int Assign::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        //std::set<std::string>* temp_args = new std::set<std::string>(*vars);
         int r_result = this->rexpr_.init_check(ss, vars);
-        if (l_result and r_result) {
-            return 1;
-        } else {
+        if (!r_result) {
+            std::cout<< "Error in Assign Right Part" <<endl;
             return 0;
         }
-
-
+        std::string var_name = this->lexpr_.get_text();
+        vars->insert(var_name);
+        return 1;
     }
     /*statement: l_expr ':' ident '=' expr ';'
     {$$ = new AST::AssignDeclare(*$1, *$5, *$3);};*/
-    int AssignDeclare::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        // TODO need to add to the table here
-        int l_result = this->lexpr_.init_check(ss, vars); // won't be in the table if we're creating it now
+    int AssignDeclare::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        //std::set<std::string>* temp_args = new std::set<std::string>(*vars);
         int r_result = this->rexpr_.init_check(ss, vars);
-        if (l_result and r_result) {
-            vars.insert(this->static_type_.str());
-            return 1;
-        } else {
+        if (!r_result) {
+            std::cout<< "Error in AssignDeclare Right Part" <<endl;
             return 0;
         }
+        std::string var_name = this->lexpr_.get_text();
+        vars->insert(var_name);
+        return 1;
     }
 
-    int Return::init_check(StaticSemantics *ss, std::set<std::string> vars) {
+    int Return::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
         int result = this->expr_.init_check(ss, vars);
-        if (result) {
-            return 1;
-        }
-        return 0;
+        return result;
     }
 
-    int If::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        int cond_result = this->cond_.init_check(ss, vars);
-        std::set<std::string>* true_part = new std::set<std::string>(vars);
-        std::set<std::string>* false_part = new std::set<std::string>(vars);
-        int true_result = this->truepart_.init_check(ss, *true_part);
-        int false_result = this->falsepart_.init_check(ss, *false_part);
-        // add the intersecting variables of true and false parts
-        if (cond_result and true_result and false_result) {
+    int If::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        if (!(this->cond_.init_check(ss, vars))){
+            std::cout << "Error in If Statement Conditional Part: " << cond_.str()<<endl;
+            return 0;
+        }
+        std::set<std::string>* true_args = new std::set<std::string>(*vars);
+        // true and false are seqs of ASTNodes
+        //AST::Block statements = this->statements_;
+        vector < AST::ASTNode * > true_list =  this->truepart_.elements_;
+        for (AST::ASTNode *true_item: true_list) {
+            int result = true_item->init_check(ss, true_args);
+            if (!result) {
+                std::cout << "Error in If Statement True Part: " << true_item->str()<<endl;
+                return 0;
+            }
+        }
+        std::set<std::string>* false_args = new std::set<std::string>(*vars);
+        vector < AST::ASTNode * > false_list =  this->falsepart_.elements_;
+        for (AST::ASTNode *false_item: false_list) {
+            int result = false_item->init_check(ss, false_args);
+            if (!result) {
+                std::cout << "Error in If Statement False Part: " << false_item->str()<<endl;
+                return 0;
+            }
+        }
+        //exit(1);
+        // add the intersecting variables of true and false parts if every section type init OK
+        for (std::string var : *true_args) {
+            if ((false_args->find(var)) != false_args->end()) {
+                vars->insert(var);
+            }
+        }
+        return 1;
+    }
+
+    int While::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        // type check the condition and the statements, don't update the vars table
+        if (!(this->cond_.init_check(ss, vars))){
+            return 0;
+        }
+        std::set<std::string>* temp_vars = new std::set<std::string>(*vars);
+        vector < AST::ASTNode * > body_list =  this->body_.elements_;
+        for (AST::ASTNode *body_item: body_list) {
+            int result = body_item->init_check(ss, temp_vars);
+            if (!result) {
+                std::cout << "Error in While Statement Body: " << result<<endl;
+                return 0;
+            }
+        }
+        return 1;
+    }
+
+    int Typecase::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        //TODO something here?
+        return 1;
+    }
+
+    int Type_Alternative::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        //TODO something here?
+        return 1;
+    }
+
+    int Load::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        //TODO add variable to the table
+        std::cout << "Load loc: " << this->loc_.str() <<endl;
+        return this->loc_.init_check(ss, vars);
+    }
+
+    int Ident::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        std::cout << "Current Vars: " << endl;
+        for (std::string var : *vars) {
+            std::cout << var << endl;
+        }
+        if ((vars->find(this->text_)) != vars->end()) {
             return 1;
         } else {
+            std::cout << "ERROR Using Uninitialized Variable: " << this->text_ << endl;
             return 0;
         }
     }
 
-    int While::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        int cond_result = this->cond_.init_check(ss, vars);
-        std::set<std::string>* temp_vars = new std::set<std::string>(vars);
-        int body_result = this->body_.init_check(ss, *temp_vars);
-        if (cond_result and body_result) {
-            return 1;
-        }
-        return 0;
+    std::string Ident::get_text() {
+        return this->text_;
     }
 
-    int Typecase::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        //TODO something here
-        return 1;
-    }
-
-    int Type_Alternative::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        //TODO something here
-        return 1;
-    }
-
-    int Load::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        //TODO something here
-        return 1;
-    }
-
-    int Ident::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        if ((vars.find(this->text_)) != vars.end()) {
-            return 1;
-        } else {
-            return 0;
-        }
-    }
-
-    int Class::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        // check that the constructor is initialized
+    int Class::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        // check that the constructor initializes all class level vars (like any normal method)
+        //std::set<std::string>* class_args = new std::set<std::string>(*vars);
         int const_result = this->constructor_.init_check(ss, vars);
-        // check all the methods
+        if (!const_result) {
+            return 0;
+        }
+        // anything inherited from the superclass needs to have been initialized
+        ClassNode superclass = ss->class_hierarchy[this->super_.str()];
+        std::map<string, string> super_vars = superclass.instance_vars;
+        for (std::pair<std::string, string> element : super_vars) {
+            if ((vars->find(element.first)) == vars->end()){
+                return 0; // something wasn't initialized
+            }
+        }
+        // now check all the methods
         vector < AST::Method * > method_list = this->methods_.elements_;
         for (AST::Method *method: method_list) {
-            method->init_check(ss, vars);
+            std::set<std::string>* method_args = new std::set<std::string>(*vars);
+            if (!method->init_check(ss, method_args)){
+                return 0;
+            }
+            vars->insert(method->name_.text_);
         }
         // if everything goes well add the class name to the var table
-        vars.insert(this->name_.text_);
+        vars->insert(this->name_.text_);
         return 1;
     }
 
-    int Call::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        if ((vars.find(this->method_.text_)) != vars.end()) {
+    int Call::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        if ((vars->find(this->method_.text_)) != vars->end()) {
             // method was initialized! now check the args
             Actuals actual_args = this->actuals_;
             vector < Expr * > arg_list = actual_args.elements_;
             for (Expr* arg : arg_list) {
                 if (!arg->init_check(ss, vars)) {
+                    std::cout << "Actual argument not found: " << arg->str()<<endl;
                     return 0;
                 }
             }
             if (!this->receiver_.init_check(ss, vars)){
+                std::cout << "Error init checking the receiver object: " << this->receiver_.str()<<endl;
                 return 0;
             }
             return 1;
@@ -382,9 +450,9 @@ namespace AST {
         }
     }
 
-    int Construct::init_check(StaticSemantics *ss, std::set<std::string> vars) {
+    int Construct::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
         // make sure that class type has been added to the scope
-        if ((vars.find(this->method_.str()) != vars.end())) {
+        if ((vars->find(this->method_.text_) != vars->end())) {
             // then make sure the passed args were initialized
             Actuals actual_args = this->actuals_;
             vector < Expr * > arg_list = actual_args.elements_;
@@ -398,15 +466,15 @@ namespace AST {
         return 0;
     }
 
-    int IntConst::init_check(StaticSemantics *ss, std::set<std::string> vars) {
+    int IntConst::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
         return 1;
     }
 
-    int StrConst::init_check(StaticSemantics *ss, std::set<std::string> vars) {
+    int StrConst::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
         return 1;
     }
 
-    int And::init_check(StaticSemantics *ss, std::set<std::string> vars) {
+    int And::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
         int right_result = this->right_.init_check(ss, vars);
         int left_result = this->left_.init_check(ss, vars);
 
@@ -417,7 +485,7 @@ namespace AST {
         }
     }
 
-    int Or::init_check(StaticSemantics *ss, std::set<std::string> vars) {
+    int Or::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
         int right_result = this->right_.init_check(ss, vars);
         int left_result = this->left_.init_check(ss, vars);
 
@@ -429,21 +497,29 @@ namespace AST {
 
     }
 
-    int Not::init_check(StaticSemantics *ss, std::set<std::string> vars) {
+    int Not::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
         int result = this->left_.init_check(ss, vars);
         return result;
     }
 
-    int Dot::init_check(StaticSemantics *ss, std::set<std::string> vars) {
-        int right_result = this->right_.init_check(ss, vars);
-        int left_result = this->left_.init_check(ss, vars);
-
-        if (right_result and left_result) {
-            return 1;
-        } else {
+    int Dot::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        std::set<std::string>* temp_args = new std::set<std::string>(*vars);
+        int r_result = this->right_.init_check(ss, temp_args);
+        if (!r_result) {
+            std::cout<< "Error in Dot Right Part" <<endl;
             return 0;
         }
+        int l_result = this->left_.init_check(ss, temp_args);
+        if (!l_result) {
+            std::cout<< "Error in Dot Left Part" <<endl;
+            return 0;
+        }
+        vars->insert(temp_args->begin(), temp_args->end());
+        return 1;
     }
 
+    std::string Dot::get_text() {
+        return this->right_.get_text();
+    }
 
 }
