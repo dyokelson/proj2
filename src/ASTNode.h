@@ -13,8 +13,6 @@
 
 class StaticSemantics;
 
-//TODO class and method class (struct)
-
 namespace AST {
     // Abstract syntax tree.  ASTNode is abstract base class for all other nodes.
 
@@ -39,7 +37,7 @@ namespace AST {
         }
         virtual int init_check(StaticSemantics *ss, std::set<std::string> *vars) =0;
         virtual std::string get_text() = 0;
-        //virtual std::string type_infer(StaticSemantics *ss, map<std::string, std::string>* context/*class and method thingy*/) = 0;
+        virtual std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) = 0;
     protected:
         void json_indent(std::ostream& out, AST_print_context& ctx);
         void json_head(std::string node_kind, std::ostream& out, AST_print_context& ctx);
@@ -54,6 +52,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override {return "";};
     };
 
 
@@ -97,6 +96,9 @@ namespace AST {
             return 0;
         }
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override {
+            return "";
+        };
     };
 
     /* L_Expr nodes are AST nodes that can be evaluated for location.
@@ -130,6 +132,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override;
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
 
@@ -158,6 +161,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context&ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
     class Formals : public Seq<Formal> {
@@ -179,6 +183,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context&ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
     class Methods : public Seq<Method> {
@@ -210,6 +215,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
     class AssignDeclare : public Assign {
@@ -220,6 +226,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
     /* A statement could be just an expression ... but
@@ -238,6 +245,7 @@ namespace AST {
         void json(std::ostream &out, AST_print_context &ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
 
@@ -250,6 +258,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
     class If : public Statement {
@@ -262,6 +271,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
     class While : public Statement {
@@ -273,6 +283,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
 
@@ -297,6 +308,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
     /* A Quack program begins with a sequence of zero or more
@@ -314,6 +326,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
     class Type_Alternative : public ASTNode {
@@ -326,6 +339,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
     class Type_Alternatives : public Seq<Type_Alternative> {
@@ -342,6 +356,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
 
@@ -352,6 +367,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
     class Actuals : public Seq<Expr> {
@@ -373,6 +389,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
 
@@ -393,6 +410,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
 
@@ -417,6 +435,7 @@ namespace AST {
           BinOp("And", left, right) {}
        int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
        std::string get_text() override {return "";};
+       std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
    };
 
     class Or : public BinOp {
@@ -425,6 +444,7 @@ namespace AST {
                 BinOp("Or", left, right) {}
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
     class Not : public Expr {
@@ -435,6 +455,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
 
@@ -454,6 +475,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override;
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
 
@@ -469,6 +491,7 @@ namespace AST {
         void json(std::ostream& out, AST_print_context& ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
+        std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
 

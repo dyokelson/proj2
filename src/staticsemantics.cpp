@@ -29,7 +29,7 @@ public:
     MethodNode(AST::Method *method) {
         name = method->name_.text_;
 
-        return_type = method->returns_.str();
+        return_type = method->returns_.get_text();
         local_vars = map<string, string>();
         //body = vector<AST::Statement>();
 
@@ -255,14 +255,24 @@ public:
 
         int success = root_node->init_check(this, &initial_vars);
         if (success) {
-            std::cout << "Success with initialization check!";
+            std::cout << "Success with initialization check!"<<endl;
         } else {
+            std::cout << "Error with initialization check!" <<endl;
             error = true; //something went wrong
         }
     }
 
     // do type inference per method!!! can reuse this method with statements after class definitions
     void type_inference(AST::ASTNode *root) {
+        //exit(1);
+        AST::Program *root_node = (AST::Program*) root;
+        //TODO Insert built in stuff into var types
+        std::string result = root_node->type_infer(this, &var_types, "", "");
+        if (result == "Ok") {
+            std::cout << "Success with type inference!";
+        } else {
+            error = true; //something went wrong
+        }
         // do this to the methods within a class, topologically because of instance variables
         // make sure not doing anything that doesn't fit that type of instance variables - also trying to do something wrong just within the method
         //type inference for a method gets a block of statements, with list of local variables

@@ -311,6 +311,7 @@ namespace AST {
     }
 
     int Return::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
+        std::cout<< "Return Statement Expr: " <<expr_.str()<<endl;
         int result = this->expr_.init_check(ss, vars);
         return result;
     }
@@ -403,8 +404,10 @@ namespace AST {
     int Class::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
         // check that the constructor initializes all class level vars (like any normal method)
         //std::set<std::string>* class_args = new std::set<std::string>(*vars);
+        vars->insert(this->name_.text_);
         int const_result = this->constructor_.init_check(ss, vars);
         if (!const_result) {
+            std::cout << "Error Init Checking Class Constructor: " << this->name_.text_<<endl;
             return 0;
         }
         // anything inherited from the superclass needs to have been initialized
@@ -418,6 +421,7 @@ namespace AST {
         // now check all the methods
         vector < AST::Method * > method_list = this->methods_.elements_;
         for (AST::Method *method: method_list) {
+            std::cout << "Init Checking Method: " << method->name_.text_;
             std::set<std::string>* method_args = new std::set<std::string>(*vars);
             if (!method->init_check(ss, method_args)){
                 return 0;
@@ -425,7 +429,7 @@ namespace AST {
             vars->insert(method->name_.text_);
         }
         // if everything goes well add the class name to the var table
-        vars->insert(this->name_.text_);
+//        vars->insert(this->name_.text_);
         return 1;
     }
 
@@ -520,6 +524,322 @@ namespace AST {
 
     std::string Dot::get_text() {
         return this->right_.get_text();
+    }
+
+
+    /* IMPLEMENT ALL THE TYPE INFERENCE METHODS */
+
+    std::string Program::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        // type inference for each class in classes
+        AST::Classes classes = this->classes_;
+        vector < AST::Class * > class_list = classes.elements_;
+        for (AST::Class *clazz: class_list) {
+            std::string cls_name = clazz->name_.text_;
+            std::cout << "Type Inferring Class: " << cls_name << endl;
+            std::string class_result = clazz->type_infer(ss, context, cls_name, cur_method);
+            if (class_result=="Top") {
+                return "Top";
+            }
+        }
+        // type infer each statement in the statement block that comes after the classes
+        AST::Block statements = this->statements_;
+        vector < AST::ASTNode * > statement_list =  statements.elements_;
+        for (AST::ASTNode *stmt: statement_list) {
+            std::cout << "Type Inferring Statement: " << stmt->str() << endl;
+            std::string stmt_result = stmt->type_infer(ss, context, "$main", "$meth");
+            if (stmt_result=="Top") {
+                return "Top";
+            }
+        }
+        return "Ok";
+    }
+
+    std::string Formal::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        Ident formal_arg = this->var_;
+        string arg = formal_arg.text_;
+        string type = this->type_.text_;
+        std::cout << "Adding formal arg: " << arg << " with type: "<< type << endl;
+        (*context)[arg] = type;
+        return "Ok";
+    }
+
+    std::string Method::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        // init check formal args - add
+        //std::set<std::string>* method_args = new std::set<std::string>(*vars);
+        std::string dis_method = this->name_.text_;
+        //TODO later check if its an inherited method and make sure it gets all those types
+        for (Formal* fml : this->formals_.elements_) {
+            std::string fml_result = fml->type_infer(ss, context, cur_class, dis_method);
+            if (fml_result=="Top") {
+                std::cout << "Type Infer Method Checking Results: Formal Arg Result: " << fml_result <<endl;
+                return "Top";
+            }
+        }
+        // type infer method body
+        AST::Block statements = this->statements_;
+        vector < AST::ASTNode * > statement_list =  statements.elements_;
+        for (AST::ASTNode *stmt: statement_list) {
+            std::string stmt_result = stmt->type_infer(ss, context, cur_class, dis_method);
+            if (stmt_result == "Top") {
+                std::cout << "Type Infer Method Checking Results: Statement Result: " << stmt_result<<endl;
+                return "Top";
+            }
+        }
+        // type infer return statement
+        std::string return_result = this->returns_.type_infer(ss, context, cur_class, dis_method);
+        ClassNode cn = ss->class_hierarchy[cur_class];
+        std::cout << "Type Infer Method Checking Error Class Node: " << cn.name_<<endl;
+        MethodNode* mn = cn.methods[dis_method];
+        std::cout << "Type Infer Method Checking Error Method Node: " << mn->name<<endl;
+        // TODO getting the seg fault here, can't find the method node?
+        std::cout << "Type Infer Method Checking Error Return Type: " << mn->return_type<<endl;
+
+        std::string should_return = mn->return_type;
+        exit(1);
+        if (return_result != should_return) {
+            std::cout << "Error in Method Checking Results: Return Result: " << return_result<<endl;
+            return "Top";
+        }
+        // add method name and return type to the context table if all was successful
+        (*context)[dis_method] = return_result;
+        return "Ok";
+
+    }
+    /*  statement: l_expr '=' expr ';'
+    { $$ = new AST::Assign(*$1, *$3); };*/
+    std::string Assign::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        //std::set<std::string>* temp_args = new std::set<std::string>(*vars);
+        std::string r_result = this->rexpr_.type_infer(ss, context, cur_class, cur_method);
+        if (r_result== "Top") {
+            std::cout<< "Error in Assign Right Part" <<endl;
+            return r_result;
+        }
+        std::string var_name = this->lexpr_.get_text();
+        (*context)[var_name] = r_result;
+        return r_result;
+    }
+    /*statement: l_expr ':' ident '=' expr ';'
+    {$$ = new AST::AssignDeclare(*$1, *$5, *$3);};*/
+    std::string AssignDeclare::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        //std::set<std::string>* temp_args = new std::set<std::string>(*vars);
+        std::string r_result = this->rexpr_.type_infer(ss, context, cur_class, cur_method);
+        std::string type = this->static_type_.text_;
+        if (r_result == type) {
+            std::string var_name = this->lexpr_.get_text();
+            (*context)[var_name] = type;
+            return r_result;
+        }
+        std::cout<< "Error in AssignDeclare Type Inference " <<endl;
+        return "Top";
+    }
+
+    std::string Return::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        std::string result = this->expr_.type_infer(ss, context, cur_class, cur_method);
+        return result;
+    }
+
+    std::string If::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        std::string cond_result = this->cond_.type_infer(ss, context, cur_class, cur_method);
+        if (cond_result == "Boolean"){
+            std::map<std::string, std::string>* true_args = new std::map<std::string, std::string>(*context);
+            // true and false are seqs of ASTNodes
+            //AST::Block statements = this->statements_;
+            vector < AST::ASTNode * > true_list =  this->truepart_.elements_;
+            for (AST::ASTNode *true_item: true_list) {
+                std::string result = true_item->type_infer(ss, true_args, cur_class, cur_method);
+                if (result=="Top") {
+                    std::cout << "Error in If Statement True Part: " << true_item->str()<<endl;
+                    return result;
+                }
+            }
+            std::map<std::string, std::string>* false_args = new std::map<std::string, std::string>(*context);
+            vector < AST::ASTNode * > false_list =  this->falsepart_.elements_;
+            for (AST::ASTNode *false_item: false_list) {
+                std::string result = false_item->type_infer(ss, true_args, cur_class, cur_method);
+                if (result=="Top") {
+                    std::cout << "Error in If Statement False Part: " << false_item->str()<<endl;
+                    return result;
+                }
+            }
+            // add the intersecting variables of true and false parts if every section type init OK
+            for (std::pair<std::string,std::string> element : *true_args) {
+                std::string var_name = element.first;
+                if ((false_args->count(var_name))) {
+                    (*context)[var_name] = element.second;
+                }
+            }
+            return "Ok";
+        }
+        return "Top";
+    }
+
+    std::string While::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        // type check the condition and the statements, don't update the vars table
+        std::string cond_result = this->cond_.type_infer(ss, context, cur_class, cur_method);
+        if (cond_result == "Boolean"){
+            std::map<std::string, std::string>* temp_vars = new std::map<std::string, std::string>(*context);
+            vector < AST::ASTNode * > body_list =  this->body_.elements_;
+            for (AST::ASTNode *body_item: body_list) {
+                std::string result = body_item->type_infer(ss, temp_vars, cur_class, cur_method);
+                if (result == "Top") {
+                    std::cout << "Error in While Statement Body: " << result<<endl;
+                    return "Top";
+                }
+            }
+            return "Ok";
+        }
+        return "Top";
+    }
+
+    std::string Typecase::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        //TODO something here?
+        return "Ok";
+    }
+
+    std::string Type_Alternative::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        //TODO something here?
+        return "Ok";
+    }
+
+    std::string Load::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        std::cout << "Load loc: " << this->loc_.str() <<endl;
+        return this->loc_.type_infer(ss, context, cur_class, cur_method);
+    }
+
+    std::string Ident::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        std::cout << "Current Vars: " << endl;
+        for (std::pair<std::string, string> element : *context) {
+            std::cout << element.first << endl;
+        }
+        if ((context->count(this->text_))) {
+            return (*context)[this->text_];
+        } else {
+            std::cout << "ERROR Can't find Type of Variable: " << this->text_ << endl;
+            return "Top";
+        }
+    }
+
+    std::string Class::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        // check that the constructor initializes all class level vars (like any normal method)
+        //std::set<std::string>* class_args = new std::set<std::string>(*vars);
+        std::string dis_class = this->name_.text_;
+        ClassNode cn = ss->class_hierarchy[dis_class];
+        MethodNode mn = cn.constructor_;
+        std::string should_return = mn.return_type;
+        std::cout<< "Class should return type "<< should_return << endl;
+        (*context)[dis_class] = should_return;
+        std::string const_result = this->constructor_.type_infer(ss, context, dis_class, cur_method);
+        if (const_result== "Top") {
+            std::cout<< "Type Error in Constructor" << endl;
+            return const_result;
+        }
+        // TODO anything inherited from the superclass needs to be consistent
+
+        // now check all the methods
+        vector < AST::Method * > method_list = this->methods_.elements_;
+        for (AST::Method *method: method_list) {
+            std::map<std::string, std::string>* method_args = new std::map<std::string, std::string>(*context);
+            std::string meth_return = method->type_infer(ss, method_args, dis_class, cur_method);
+            if (meth_return=="Top"){
+                return "Top";
+            }
+            (*context)[method->name_.text_] = meth_return;
+        }
+        // if everything goes well add the class name to the var table
+        // get what we need from class hierarchy to add return type
+//        ClassNode cn = ss->class_hierarchy[dis_class];
+//        MethodNode mn = cn.constructor_;
+//        std::string should_return = mn.return_type;
+//        (*context)[dis_class] = should_return;
+        return should_return;
+    }
+
+    std::string Call::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method){
+        //type infer the receiver
+        std::string receiver = this->receiver_.type_infer(ss, context, cur_class, cur_method);
+        std::string method_call = this->receiver_.get_text();
+
+        //look up the method name in the receiver class
+        ClassNode cn = ss->class_hierarchy[cur_class];
+        MethodNode* mn = cn.methods[method_call];
+        std::string should_return = mn->return_type;
+
+        // TODO can check if actual arguments are correct, skipping for now
+        // returns the return type of the method
+        return should_return;
+
+    }
+
+    std::string Construct::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        //  type infer the passed args
+        Actuals actual_args = this->actuals_;
+        vector < Expr * > arg_list = actual_args.elements_;
+        for (Expr* arg : arg_list) {
+            if (arg->type_infer(ss, context, cur_class, cur_method) == "Top") {
+                return "Top";
+            }
+        }
+        // all is good, look up the return type in the class hierarchy and return it
+        ClassNode cn = ss->class_hierarchy[cur_class];
+        MethodNode mn = cn.constructor_;
+        std::string should_return = mn.return_type;
+
+        return should_return;
+
+    }
+
+    std::string IntConst::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        return "Int";
+    }
+
+    std::string StrConst::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        return "String";
+    }
+
+    std::string And::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        std::string right_result = this->right_.type_infer(ss, context, cur_class, cur_method);
+        std::string left_result = this->left_.type_infer(ss, context, cur_class, cur_method);
+
+        if (right_result=="Boolean" and left_result=="Boolean") {
+            return "Boolean";
+        } else {
+            return "Top";
+        }
+    }
+
+    std::string Or::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        std::string right_result = this->right_.type_infer(ss, context, cur_class, cur_method);
+        std::string left_result = this->left_.type_infer(ss, context,cur_class, cur_method);
+
+        if (right_result=="Boolean" and left_result=="Boolean") {
+            return "Boolean";
+        } else {
+            return "Top";
+        }
+
+    }
+
+    std::string Not::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        std::string result = this->left_.type_infer(ss, context, cur_class, cur_method);
+        if (result == "Boolean") {
+            return "Boolean";
+        } else {
+            return "Top";
+        }
+    }
+
+    std::string Dot::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
+        map<std::string, std::string>* temp_args = new map<std::string, std::string>();
+        temp_args->insert(context->begin(), context->end());
+        std::string l_result = this->left_.type_infer(ss, temp_args, cur_class, cur_method);
+        // TODO: what is on the left will affect what is on the right...
+        std::string r_result = this->right_.type_infer(ss, temp_args, cur_class, cur_method);
+        if (l_result == "Top" or r_result == "Top") {
+            std::cout<< "Error in Type Inferring Dot" <<endl;
+            return "Top";
+        }
+        context->insert(temp_args->begin(), temp_args->end());
+        return "Ok";
     }
 
 }
