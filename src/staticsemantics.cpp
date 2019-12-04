@@ -10,6 +10,7 @@
 #include <list>
 #include "string.h"
 #include "ASTNode.h"
+#include "ASTBuiltIns.h"
 
 using namespace std;
 
@@ -21,7 +22,6 @@ public:
     //vector<string> formal_arg_types;
     // table of local variables (anything passed in, defined inside or class level instance vars)
     map<string, string> local_vars;
-    //vector<AST::Statement> body;
 
     MethodNode() {
     }
@@ -31,7 +31,6 @@ public:
 
         return_type = method->returns_.get_text();
         local_vars = map<string, string>();
-        //body = vector<AST::Statement>();
 
         AST::Formals formals = method->formals_;
         if (formals.elements_.size() != 0) {
@@ -41,10 +40,6 @@ public:
             }
         }
     }
-    //string type_check(AST::Method ast_method, map<string, string> context, ClassNode classNode) {
-
-
-   // }
 
 };
 
@@ -52,13 +47,11 @@ public:
 class ClassNode {
     public:
         string name_;
-        // keep track of parents and children for the class hierarchy
+        // keep track of parents for the class hierarchy
         string parent_;
         // attributes of the class (vars, methods)
-        // type check the constructor before the methods
-            // needs to initialize the same types as inherited class
         map<string, string> instance_vars; // names of the variables,
-        map<string, MethodNode*> methods;
+        map<string, MethodNode> methods;
         // constructor
         MethodNode constructor_;
         bool visited;
@@ -76,7 +69,7 @@ class ClassNode {
             resolved = false;
             constructor_ = MethodNode();
             instance_vars = map<string, string>();
-            methods = map<string, MethodNode*>();
+            methods = map<string, MethodNode>();
         }
 
         // TODO do I need all these or should I just access the public fields and push later?
@@ -84,8 +77,8 @@ class ClassNode {
             parent = parent;
         }
 
-        void add_method(MethodNode* method) {
-            methods[method->name] = method;
+        void add_method(MethodNode method) {
+            methods[method.name] = method;
         }
 };
 
@@ -107,6 +100,7 @@ public:
     map <string, string> var_types;
     // indicates an error occurred sometime during static semantics check and should return nullptr
     bool error = false;
+    bool changed = true;
     AST::ASTNode * root;
 
     StaticSemantics(AST::ASTNode *root) { // default constructor
@@ -185,15 +179,19 @@ public:
             ClassNode new_class = ClassNode(cls_name, par_name);
 
             // populate all the things!
-            AST::ASTNode *constr = &(clazz->constructor_);
-            AST::Method *construct = (AST::Method *) constr;
-            new_class.constructor_ = MethodNode(construct);
+            //AST::ASTNode *constr = &(clazz->constructor_);
+            AST::Method *constr = &(clazz->constructor_);
+            //AST::Method *construct = (AST::Method *) constr;
+            MethodNode constructor = MethodNode(constr);
+            new_class.constructor_ = constructor;
             new_class.instance_vars = new_class.constructor_.local_vars; //constructors variables are the class level - need this?
+            new_class.add_method(constructor);
 
             vector < AST::Method * > method_list = clazz->methods_.elements_;
             for (AST::Method *method: method_list) {
                 MethodNode new_method = MethodNode(method);
-                new_class.add_method(&new_method);
+                new_class.add_method(new_method);
+                std::cout << "Created method node with name: " << new_method.name << endl;
             }
 
             std::cout << "Class " << cls_name << " created class node with name: " << new_class.name_ << " and parent " << new_class.parent_ <<"\n" << std::flush;
@@ -204,16 +202,41 @@ public:
         ClassNode obj_node = ClassNode("Obj", "None");
         obj_node.visited = true;
         obj_node.resolved = true;
+        obj_node.constructor_.return_type = "Obj";
         class_hierarchy["Obj"] = obj_node;
         sorted_classes.push_back(obj_node);
         ClassNode string_node = ClassNode("String", "Obj");
+        string_node.constructor_.return_type = "String";
         class_hierarchy["String"] = string_node;
         ClassNode bool_node = ClassNode("Boolean", "Obj");
+        bool_node.constructor_.return_type = "Boolean";
         class_hierarchy["Boolean"] = bool_node;
         ClassNode int_node = ClassNode("Int", "Obj");
+        MethodNode printmn = MethodNode();
+        printmn.name = "PRINT";
+        (int_node.methods)["PRINT"] = printmn;
+        MethodNode plusmn = MethodNode();
+        plusmn.name = "PLUS";
+        (int_node.methods)["PLUS"] = plusmn;
+        int_node.constructor_.return_type = "Int";
         class_hierarchy["Int"] = int_node;
         ClassNode nothing_node = ClassNode("Nothing", "Obj");
+        nothing_node.constructor_.return_type = "Nothing";
         class_hierarchy["Nothing"] = nothing_node;
+//        ClassNode obj_node = ClassNode(AST_builtins::Obj.name_.text_, AST_builtins::Obj.super_.text_);
+//        AST::Method construct = (AST::Method) AST_builtins::Obj.constructor_;
+//        MethodNode constructor = MethodNode(&AST_builtins::Obj.constructor_);
+//        obj_node.constructor_ = constructor;
+//        obj_node.visited = true;
+//        obj_node.resolved = true;
+//        class_hierarchy["Obj"] = obj_node;
+//        sorted_classes.push_back(obj_node);
+//
+//        ClassNode int_node = ClassNode(AST_builtins::Int.name_.text_, AST_builtins::Int.super_.text_);
+//        //AST::Method construct_int = (AST::Method) AST_builtins::Int.constructor_;
+//        MethodNode constructor_int = MethodNode(&(AST_builtins::Int.constructor_));
+//        int_node.constructor_ = constructor_int;
+//        class_hierarchy["Int"] = int_node;
 
         // now go through the class_hierarchy again and check for cycles and nonexistent parents
         std::cout << "SORTING " << class_hierarchy.size() << " CLASSES\n" << std::flush;
@@ -264,15 +287,28 @@ public:
 
     // do type inference per method!!! can reuse this method with statements after class definitions
     void type_inference(AST::ASTNode *root) {
-        //exit(1);
+
+        var_types["Obj"] = "Obj";
+        var_types["Int"] = "Int";
+        var_types["Boolean"] = "Boolean";
+        var_types["String"] = "String";
+        var_types["Nothing"] = "Nothing";
+        var_types["PRINT"] = "Nothing";
+        var_types["PLUS"] = "Int";
+
         AST::Program *root_node = (AST::Program*) root;
         //TODO Insert built in stuff into var types
-        std::string result = root_node->type_infer(this, &var_types, "", "");
-        if (result == "Ok") {
-            std::cout << "Success with type inference!";
-        } else {
-            error = true; //something went wrong
+
+        while (changed) { // initialized as true
+            changed = false;
+            std::string result = root_node->type_infer(this, &var_types, "", "");
+            if (result == "Ok") {
+                std::cout << "Success with type inference!";
+            } else {
+                error = true; //something went wrong
+            }
         }
+
         // do this to the methods within a class, topologically because of instance variables
         // make sure not doing anything that doesn't fit that type of instance variables - also trying to do something wrong just within the method
         //type inference for a method gets a block of statements, with list of local variables
@@ -285,8 +321,41 @@ public:
 
     // return the least common ancestor of the two classes
     string lca(string type1, string type2) {
+        if ((type1 == "Top") or (type2 == "Top")) {
+            return "Top";
+        }
         // find these two classes on the class hierarchy table and return the lca
         // if error, return Top
-        return "Hello";
+        if (type1 == type2) {
+            return type1;
+        } else {
+            ClassNode cn1 = class_hierarchy[type1];
+            ClassNode cn2 = class_hierarchy[type2];
+            string t1 = cn1.parent_;
+            string t2 = cn2.parent_;
+            vector<string> parents1 = vector<string>();
+            vector<string> parents2 = vector<string>();
+            // get the parents in order and populate the lists
+            for (ClassNode cls : sorted_classes) {
+                string cls_name = cls.name_;
+                if (cls_name == t1) {
+                    parents1.push_back(cls_name);
+                    t1 = cls_name;
+                }
+                if (cls_name == t2) {
+                    parents2.push_back(cls_name);
+                    t2 = cls_name;
+                }
+            }
+            // now just return the first match between the two lists, if no match...?
+            for (string p : parents1) {
+                for (string pp : parents2) {
+                    if (p == pp) {
+                        return p;
+                    }
+                }
+            }
+        }
+        return "Top"; // nothing matched some sort of error
     }
 };

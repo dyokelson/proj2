@@ -384,6 +384,10 @@ namespace AST {
         return this->loc_.init_check(ss, vars);
     }
 
+    std::string Load::get_text() {
+        return this->loc_.get_text();
+    }
+
     int Ident::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
         std::cout << "Current Vars: " << endl;
         for (std::string var : *vars) {
@@ -523,7 +527,9 @@ namespace AST {
     }
 
     std::string Dot::get_text() {
-        return this->right_.get_text();
+        std::string text = (this->left_).get_text() + '.' + this->right_.get_text();
+        return text;
+        //return this->right_.get_text();
     }
 
 
@@ -581,28 +587,24 @@ namespace AST {
         for (AST::ASTNode *stmt: statement_list) {
             std::string stmt_result = stmt->type_infer(ss, context, cur_class, dis_method);
             if (stmt_result == "Top") {
-                std::cout << "Type Infer Method Checking Results: Statement Result: " << stmt_result<<endl;
+                std::cout << "Type Infer Method Checking Results in class: "<<cur_class<<" and Method: " << dis_method<<endl;
                 return "Top";
             }
         }
         // type infer return statement
         std::string return_result = this->returns_.type_infer(ss, context, cur_class, dis_method);
         ClassNode cn = ss->class_hierarchy[cur_class];
-        std::cout << "Type Infer Method Checking Error Class Node: " << cn.name_<<endl;
-        MethodNode* mn = cn.methods[dis_method];
-        std::cout << "Type Infer Method Checking Error Method Node: " << mn->name<<endl;
-        // TODO getting the seg fault here, can't find the method node?
-        std::cout << "Type Infer Method Checking Error Return Type: " << mn->return_type<<endl;
+        std::map<string, MethodNode> methods = cn.methods;
+        MethodNode mn = methods[dis_method];
 
-        std::string should_return = mn->return_type;
-        exit(1);
+        std::string should_return = mn.return_type;
         if (return_result != should_return) {
             std::cout << "Error in Method Checking Results: Return Result: " << return_result<<endl;
             return "Top";
         }
         // add method name and return type to the context table if all was successful
         (*context)[dis_method] = return_result;
-        return "Ok";
+        return return_result;
 
     }
     /*  statement: l_expr '=' expr ';'
@@ -610,13 +612,35 @@ namespace AST {
     std::string Assign::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
         //std::set<std::string>* temp_args = new std::set<std::string>(*vars);
         std::string r_result = this->rexpr_.type_infer(ss, context, cur_class, cur_method);
+        std::cout<< "VARIABLE TYPE "<< r_result <<endl;
         if (r_result== "Top") {
             std::cout<< "Error in Assign Right Part" <<endl;
             return r_result;
         }
         std::string var_name = this->lexpr_.get_text();
-        (*context)[var_name] = r_result;
-        return r_result;
+        std::cout<< "VARIABLE NAME "<< var_name <<endl;
+        // if variable is already in the table we have to get the lca
+        std::string new_type;
+        if (context->count(var_name)) {
+            //get the current type in the table
+            std::string cur_type = (*context)[var_name];
+            std::cout<< "CURRENT TYPE "<< cur_type <<endl;
+            if (r_result == "") {
+                return cur_type;
+            }
+            //get the lca
+            new_type = ss->lca(cur_type, r_result);
+            std::cout<< "NEW TYPE "<< new_type <<endl;
+            // if they are not the same set the changed flag! (if they are, don't say anything changed)
+            if (cur_type != new_type) {
+                ss->changed = true;
+            }
+        } else { // if not in the table, we are adding something, set the changed flag!
+            new_type = r_result;
+            ss->changed = true;
+        }
+        (*context)[var_name] = new_type;
+        return new_type;
     }
     /*statement: l_expr ':' ident '=' expr ';'
     {$$ = new AST::AssignDeclare(*$1, *$5, *$3);};*/
@@ -709,7 +733,7 @@ namespace AST {
     std::string Ident::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
         std::cout << "Current Vars: " << endl;
         for (std::pair<std::string, string> element : *context) {
-            std::cout << element.first << endl;
+            std::cout << element.first << " with type "<<element.second<< endl;
         }
         if ((context->count(this->text_))) {
             return (*context)[this->text_];
@@ -721,7 +745,7 @@ namespace AST {
 
     std::string Class::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
         // check that the constructor initializes all class level vars (like any normal method)
-        //std::set<std::string>* class_args = new std::set<std::string>(*vars);
+        // std::set<std::string>* class_args = new std::set<std::string>(*vars);
         std::string dis_class = this->name_.text_;
         ClassNode cn = ss->class_hierarchy[dis_class];
         MethodNode mn = cn.constructor_;
@@ -761,8 +785,8 @@ namespace AST {
 
         //look up the method name in the receiver class
         ClassNode cn = ss->class_hierarchy[cur_class];
-        MethodNode* mn = cn.methods[method_call];
-        std::string should_return = mn->return_type;
+        MethodNode mn = cn.methods[method_call];
+        std::string should_return = mn.return_type;
 
         // TODO can check if actual arguments are correct, skipping for now
         // returns the return type of the method
@@ -776,6 +800,7 @@ namespace AST {
         vector < Expr * > arg_list = actual_args.elements_;
         for (Expr* arg : arg_list) {
             if (arg->type_infer(ss, context, cur_class, cur_method) == "Top") {
+                std::cout << "Error checking args of constructor"<<endl;
                 return "Top";
             }
         }
@@ -831,10 +856,11 @@ namespace AST {
     std::string Dot::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
         map<std::string, std::string>* temp_args = new map<std::string, std::string>();
         temp_args->insert(context->begin(), context->end());
-        std::string l_result = this->left_.type_infer(ss, temp_args, cur_class, cur_method);
+        std::cout<< "IS THIS A THIS "<< this->left_.get_text() <<endl;
+        // std::string l_result = this->left_.type_infer(ss, temp_args, cur_class, cur_method);
         // TODO: what is on the left will affect what is on the right...
         std::string r_result = this->right_.type_infer(ss, temp_args, cur_class, cur_method);
-        if (l_result == "Top" or r_result == "Top") {
+        if (/*l_result == "Top" or */r_result == "Top") {
             std::cout<< "Error in Type Inferring Dot" <<endl;
             return "Top";
         }

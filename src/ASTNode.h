@@ -244,7 +244,7 @@ namespace AST {
         Load(LExpr &loc) : loc_{loc} {}
         void json(std::ostream &out, AST_print_context &ctx) override;
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
-        std::string get_text() override {return "";};
+        std::string get_text() override;
         std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
     };
 
@@ -298,11 +298,11 @@ namespace AST {
 
         Ident& name_;
         Ident& super_;
-        ASTNode& constructor_;
+        Method& constructor_;
         Methods& methods_;
 
         explicit Class(Ident& name, Ident& super,
-                 ASTNode& constructor, Methods& methods) :
+                 Method& constructor, Methods& methods) :
             name_{name},  super_{super},
             constructor_{constructor}, methods_{methods} {};
         void json(std::ostream& out, AST_print_context& ctx) override;
