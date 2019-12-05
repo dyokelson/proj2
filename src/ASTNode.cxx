@@ -752,6 +752,7 @@ namespace AST {
         std::string should_return = mn.return_type;
         std::cout<< "Class should return type "<< should_return << endl;
         (*context)[dis_class] = should_return;
+        (*context)["this"] = should_return;
         std::string const_result = this->constructor_.type_infer(ss, context, dis_class, cur_method);
         if (const_result== "Top") {
             std::cout<< "Type Error in Constructor" << endl;
@@ -857,7 +858,7 @@ namespace AST {
         map<std::string, std::string>* temp_args = new map<std::string, std::string>();
         temp_args->insert(context->begin(), context->end());
         std::cout<< "IS THIS A THIS "<< this->left_.get_text() <<endl;
-        // std::string l_result = this->left_.type_infer(ss, temp_args, cur_class, cur_method);
+        std::string l_result = this->left_.type_infer(ss, temp_args, cur_class, cur_method);
         // TODO: what is on the left will affect what is on the right...
         std::string r_result = this->right_.type_infer(ss, temp_args, cur_class, cur_method);
         if (/*l_result == "Top" or */r_result == "Top") {

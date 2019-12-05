@@ -223,20 +223,6 @@ public:
         ClassNode nothing_node = ClassNode("Nothing", "Obj");
         nothing_node.constructor_.return_type = "Nothing";
         class_hierarchy["Nothing"] = nothing_node;
-//        ClassNode obj_node = ClassNode(AST_builtins::Obj.name_.text_, AST_builtins::Obj.super_.text_);
-//        AST::Method construct = (AST::Method) AST_builtins::Obj.constructor_;
-//        MethodNode constructor = MethodNode(&AST_builtins::Obj.constructor_);
-//        obj_node.constructor_ = constructor;
-//        obj_node.visited = true;
-//        obj_node.resolved = true;
-//        class_hierarchy["Obj"] = obj_node;
-//        sorted_classes.push_back(obj_node);
-//
-//        ClassNode int_node = ClassNode(AST_builtins::Int.name_.text_, AST_builtins::Int.super_.text_);
-//        //AST::Method construct_int = (AST::Method) AST_builtins::Int.constructor_;
-//        MethodNode constructor_int = MethodNode(&(AST_builtins::Int.constructor_));
-//        int_node.constructor_ = constructor_int;
-//        class_hierarchy["Int"] = int_node;
 
         // now go through the class_hierarchy again and check for cycles and nonexistent parents
         std::cout << "SORTING " << class_hierarchy.size() << " CLASSES\n" << std::flush;
@@ -295,6 +281,10 @@ public:
         var_types["Nothing"] = "Nothing";
         var_types["PRINT"] = "Nothing";
         var_types["PLUS"] = "Int";
+        var_types["True"] = "Boolean";
+        var_types["False"] = "Boolean";
+        var_types["true"] = "Boolean";
+        var_types["false"] = "Boolean";
 
         AST::Program *root_node = (AST::Program*) root;
         //TODO Insert built in stuff into var types
