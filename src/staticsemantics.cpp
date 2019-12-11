@@ -1,8 +1,7 @@
 //
-// Created by dewimaharani on 11/11/19.
+// Created by Dewi Yokelson on 11/11/19.
 //
 
-//#include "staticsemantics.h"
 #include <iostream>
 #include <map>
 #include <vector>
@@ -19,6 +18,7 @@ class MethodNode {
 public:
     string name;
     string return_type;
+    string inherited_from;
     //vector<string> formal_arg_types;
     // table of local variables (anything passed in, defined inside or class level instance vars)
     map<string, string> local_vars;
@@ -199,27 +199,68 @@ public:
         } // end for class in classes
 
         // Create Built-In Classes
+        // Obj Class
         ClassNode obj_node = ClassNode("Obj", "None");
         obj_node.visited = true;
         obj_node.resolved = true;
         obj_node.constructor_.return_type = "Obj";
         class_hierarchy["Obj"] = obj_node;
         sorted_classes.push_back(obj_node);
+
+        // Obj Methods
+        MethodNode printmn = MethodNode();
+        printmn.name = "PRINT";
+        printmn.return_type = "Nothing";
+        (obj_node.methods)["PRINT"] = printmn;
+        MethodNode strmn = MethodNode();
+        strmn.name = "STR";
+        strmn.return_type = "String";
+        (obj_node.methods)["STR"] = strmn;
+
+        //String Class
         ClassNode string_node = ClassNode("String", "Obj");
         string_node.constructor_.return_type = "String";
         class_hierarchy["String"] = string_node;
+        (string_node.methods)["PRINT"] = printmn;
+        (string_node.methods)["STR"] = strmn;
+        // String PLUS method (concatenation)
+        MethodNode plusmn = MethodNode();
+        plusmn.name = "PLUS";
+        plusmn.return_type = "String";
+        (string_node.methods)["PLUS"] = plusmn;
+
+        //Boolean Class
         ClassNode bool_node = ClassNode("Boolean", "Obj");
         bool_node.constructor_.return_type = "Boolean";
         class_hierarchy["Boolean"] = bool_node;
+        (bool_node.methods)["PRINT"] = printmn;
+        (bool_node.methods)["STR"] = strmn;
+
+        //Int Class
         ClassNode int_node = ClassNode("Int", "Obj");
-        MethodNode printmn = MethodNode();
-        printmn.name = "PRINT";
-        (int_node.methods)["PRINT"] = printmn;
-        MethodNode plusmn = MethodNode();
-        plusmn.name = "PLUS";
-        (int_node.methods)["PLUS"] = plusmn;
         int_node.constructor_.return_type = "Int";
+        (int_node.methods)["PRINT"] = printmn;
+        (int_node.methods)["STR"] = strmn;
+
+        //Builtin Methods for Ints that return an Int
+        vector<string> intreturnvect{ "PLUS", "MINUS", "DIVIDE", "TIMES"};
+        for (string blt : intreturnvect){
+            MethodNode mn = MethodNode();
+            mn.name = blt;
+            mn.return_type = "Int";
+            (int_node.methods)[blt] = mn;
+        }
+        //Builtin Methods for Ints that return a Boolean
+        vector<string> boolreturnvect{ ">", "<", "ATLEAST", "ATMOST", "EQUALS"};
+        for (string blt : boolreturnvect){
+            MethodNode mn = MethodNode();
+            mn.name = blt;
+            mn.return_type = "Boolean";
+            (int_node.methods)[blt] = mn;
+        }
         class_hierarchy["Int"] = int_node;
+
+        //Nothing Class
         ClassNode nothing_node = ClassNode("Nothing", "Obj");
         nothing_node.constructor_.return_type = "Nothing";
         class_hierarchy["Nothing"] = nothing_node;
@@ -246,6 +287,8 @@ public:
         initial_vars.insert("none");
         initial_vars.insert("true");
         initial_vars.insert("false");
+        initial_vars.insert("True");
+        initial_vars.insert("False");
         initial_vars.insert("Int");
         initial_vars.insert("Boolean");
         initial_vars.insert("String");
@@ -275,25 +318,33 @@ public:
     void type_inference(AST::ASTNode *root) {
 
         var_types["Obj"] = "Obj";
+        var_types["PRINT"] = "Nothing";
+        var_types["STR"] = "String";
+        var_types["PLUS"] = "Int";
+        var_types["MINUS"] = "Int";
+        var_types["TIMES"] = "Int";
+        var_types["DIVIDE"] = "Int";
+        var_types["EQUALS"] = "Boolean";
+        var_types["ATMOST"] = "Boolean";
+        var_types["ATLEAST"] = "Boolean";
+        var_types[">"] = "Boolean";
+        var_types["<"] = "Boolean";
         var_types["Int"] = "Int";
         var_types["Boolean"] = "Boolean";
         var_types["String"] = "String";
         var_types["Nothing"] = "Nothing";
-        var_types["PRINT"] = "Nothing";
-        var_types["PLUS"] = "Int";
         var_types["True"] = "Boolean";
         var_types["False"] = "Boolean";
         var_types["true"] = "Boolean";
         var_types["false"] = "Boolean";
 
         AST::Program *root_node = (AST::Program*) root;
-        //TODO Insert built in stuff into var types
 
         while (changed) { // initialized as true
             changed = false;
             std::string result = root_node->type_infer(this, &var_types, "", "");
             if (result == "Ok") {
-                std::cout << "Success with type inference!";
+                std::cout << "Success with type inference!"<<endl;
             } else {
                 error = true; //something went wrong
             }

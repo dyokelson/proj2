@@ -7,6 +7,7 @@
 #include "ASTNode.h"
 #include "Messages.h"
 #include "staticsemantics.cpp"
+#include "CodegenContext.h"
 
 #include <iostream>
 #include <unistd.h>  // getopt is here
@@ -78,6 +79,22 @@ int main(int argc, char **argv) {
                 std::cout << "Error while doing static semantic check." << std::endl;
             } else {
                 std::cout << "Success with the static semantics!!." << std::endl;
+                // generate code!
+
+                //void generate_code(AST::ASTNode *root) {
+                CodegenContext ctx(std::cout);
+                // Prologue
+                ctx.emit("#include <stdio.h>");
+                ctx.emit("#include \"Builtins.c\"");
+                ctx.emit("int main(int argc, char **argv) {");
+                // Body of generated code
+                std::string target = ctx.alloc_reg();
+                root->gen_rvalue(ctx, target);
+                // Coda
+//                ctx.emit(std::string(R"(printf("-> %d\n",)")
+//                         + target + ");");
+                ctx.emit("}");
+              //  }
             }
         } else {
             std::cout << "No tree produced." << std::endl;

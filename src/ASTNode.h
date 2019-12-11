@@ -6,10 +6,12 @@
 #define ASTNODE_H
 
 #include <string>
+#include <iostream>
 #include <sstream>
 #include <vector>
 #include <set>
 #include <map>
+#include "CodegenContext.h"
 
 class StaticSemantics;
 
@@ -38,6 +40,25 @@ namespace AST {
         virtual int init_check(StaticSemantics *ss, std::set<std::string> *vars) =0;
         virtual std::string get_text() = 0;
         virtual std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) = 0;
+        virtual void gen_rvalue(CodegenContext& ctx, std::string target_reg) {
+            std::cout << "*** No rvalue for this node ***" << std::endl;
+            //error = true;
+            //assert(false);  // Invoke the debugger!
+        }
+        /* For the calculator, an lvalue will be the name of a local
+         * variable in the generated C code.  In assembly language,
+         * it would be a register holding the memory address of the
+         * location, which might be calculated in various ways such
+         * as adding an offset to the beginning of an array.
+         */
+        virtual std::string gen_lvalue(CodegenContext& ctx) {
+            std::cout << "*** No lvalue for this node ***" << std::endl;
+            assert(false);
+        }
+        virtual void gen_branch(CodegenContext& ctx, std::string true_branch, std::string false_branch) {
+            std::cout << "*** No branching on this node ****" << std::endl;
+            assert(false);
+        }
     protected:
         void json_indent(std::ostream& out, AST_print_context& ctx);
         void json_head(std::string node_kind, std::ostream& out, AST_print_context& ctx);
@@ -143,6 +164,7 @@ namespace AST {
     class Block : public Seq<ASTNode> {
     public:
         explicit Block() : Seq("Block") {}
+        void gen_rvalue(CodegenContext& ctx, std::string target_reg) override;
      };
 
 
@@ -327,6 +349,7 @@ namespace AST {
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
         std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
+        void gen_rvalue(CodegenContext& ctx, std::string target_reg) override;
     };
 
     class Type_Alternative : public ASTNode {
@@ -411,6 +434,7 @@ namespace AST {
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
         std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
+        void gen_rvalue(CodegenContext& ctx, std::string target_reg) override;
     };
 
 
@@ -492,6 +516,7 @@ namespace AST {
         int init_check(StaticSemantics *ss, std::set<std::string> *vars) override;
         std::string get_text() override {return "";};
         std::string type_infer(StaticSemantics *ss, std::map<std::string, std::string>* context, std::string cur_class, std::string cur_method) override;
+        void gen_rvalue(CodegenContext& ctx, std::string target_reg) override;
     };
 
 
