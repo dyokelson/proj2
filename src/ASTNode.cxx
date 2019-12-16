@@ -390,10 +390,6 @@ namespace AST {
     }
 
     int Ident::init_check(StaticSemantics *ss, std::set<std::string> *vars) {
-        std::cout << "Current Vars: " << endl;
-        for (std::string var : *vars) {
-            std::cout << var << endl;
-        }
         if ((vars->find(this->text_)) != vars->end()) {
             return 1;
         } else {
@@ -543,7 +539,9 @@ namespace AST {
         for (AST::Class *clazz: class_list) {
             std::string cls_name = clazz->name_.text_;
             std::cout << "Type Inferring Class: " << cls_name << endl;
-            std::string class_result = clazz->type_infer(ss, context, cls_name, cur_method);
+            ClassNode* cn = &((ss->class_hierarchy)[cls_name]);
+            std::map<std::string, std::string>* class_args = &(cn->instance_vars);
+            std::string class_result = clazz->type_infer(ss, class_args, cls_name, cur_method);
             if (class_result=="Top") {
                 return "Top";
             }
@@ -572,7 +570,6 @@ namespace AST {
 
     std::string Method::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
         // init check formal args - add
-        //std::set<std::string>* method_args = new std::set<std::string>(*vars);
         std::string dis_method = this->name_.text_;
         //TODO later check if its an inherited method and make sure it gets all those types
         for (Formal* fml : this->formals_.elements_) {
@@ -593,20 +590,7 @@ namespace AST {
                 return "Top";
             }
         }
-        // type infer return statement
-        std::string return_result = this->returns_.type_infer(ss, context, cur_class, dis_method);
-        ClassNode cn = ss->class_hierarchy[cur_class];
-        std::map<string, MethodNode> methods = cn.methods;
-        MethodNode mn = methods[dis_method];
-
-        std::string should_return = mn.return_type;
-        if (return_result != should_return) {
-            std::cout << "Error in Method Checking Results: Return Result: " << return_result<<endl;
-            return "Top";
-        }
-        // add method name and return type to the context table if all was successful
-        (*context)[dis_method] = return_result;
-        return return_result;
+        return "Ok";
 
     }
     /*  statement: l_expr '=' expr ';'
@@ -638,15 +622,15 @@ namespace AST {
                 ss->changed = true;
                 // update the current context and also the class hierarchy table
                 (*context)[var_name] = new_type;
-                ClassNode cn = (ss->class_hierarchy)[cur_class];
-                MethodNode mn = (cn.methods)[cur_method];
-                (mn.local_vars)[var_name] = new_type;
+//                ClassNode cn = (ss->class_hierarchy)[cur_class];
+//                MethodNode mn = (cn.methods)[cur_method];
+//                (mn.local_vars)[var_name] = new_type;
             }
         } else { // if not in the table, we are adding something, set the changed flag!
             std::cout<< "R RESULT: "<<r_result<<endl;
             new_type = r_result;
             (*context)[var_name] = new_type;
-            ss->changed = true;
+            //ss->changed = true;
         }
         return new_type;
     }
@@ -670,6 +654,17 @@ namespace AST {
 
     std::string Return::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
         std::string result = this->expr_.type_infer(ss, context, cur_class, cur_method);
+        ClassNode cn = ss->class_hierarchy[cur_class];
+        std::cout << "Class Node: "<<cn.name_<<endl;
+//        std::map<string, MethodNode> methods = cn->methods;
+//        MethodNode* mn = &(methods[cur_method]);
+        MethodNode mn = (cn.methods)[cur_method];
+        std::cout << "Method Node: "<<mn.name<<endl;
+        std::string should_return = mn.return_type;
+//        if (result != should_return) {
+//            std::cout << "Error in Method Checking Results Return Result: " << result << " should return "<< should_return<<endl;
+//            return "Top";
+//        }
         return result;
     }
 
@@ -738,7 +733,7 @@ namespace AST {
     }
 
     std::string Load::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
-        std::cout << "Load loc: " << this->loc_.str() <<endl;
+        //std::cout << "Load loc: " << this->loc_.str() <<endl;
         return this->loc_.type_infer(ss, context, cur_class, cur_method);
     }
 
@@ -757,50 +752,40 @@ namespace AST {
 
     std::string Class::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
         // check that the constructor initializes all class level vars (like any normal method)
-        // std::set<std::string>* class_args = new std::set<std::string>(*vars);
         std::string dis_class = this->name_.text_;
         ClassNode cn = ss->class_hierarchy[dis_class];
         MethodNode mn = cn.constructor_;
         std::string should_return = mn.return_type;
         std::cout<< "Class should return type "<< should_return << endl;
-        (*context)[dis_class] = should_return;
         (*context)["this"] = should_return;
-        std::string const_result = this->constructor_.type_infer(ss, context, dis_class, cur_method);
+
+        std::string const_result = this->constructor_.type_infer(ss, context, dis_class, dis_class);
         if (const_result== "Top") {
             std::cout<< "Type Error in Constructor" << endl;
             return const_result;
         }
-        // TODO anything inherited from the superclass needs to be consistent
-        //ADD any inherited methods
-        std::string parent = this->super_.text_;
-        ClassNode thisNode = ss->class_hierarchy[dis_class];
-        ClassNode parentNode = ss->class_hierarchy[parent];
-        for (std::pair<string,MethodNode> element: parentNode.methods) {
-            std::cout<< "ADDING INHERITED METHOD "<<element.first<<endl;
-            MethodNode new_node = MethodNode();
-            new_node.name = element.second.name;
-            new_node.return_type = element.second.return_type;
-            new_node.inherited_from = parent;
-            new_node.local_vars = std::map<string,string>(element.second.local_vars);
-        }
 
-        // now check all the new methods
+        // now check all the methods
         vector < AST::Method * > method_list = this->methods_.elements_;
         for (AST::Method *method: method_list) {
-            std::map<std::string, std::string>* method_args = new std::map<std::string, std::string>(*context);
-            std::string meth_return = method->type_infer(ss, method_args, dis_class, cur_method);
-            if (meth_return=="Top"){
+            //std::map<std::string, std::string>* method_args = new std::map<std::string, std::string>(*context);
+            std::string dis_method = method->name_.text_;
+            MethodNode mn = (cn.methods)[dis_method];
+            std::map<std::string, std::string>* method_args = &(mn.local_vars);
+            method_args->insert(context->begin(), context->end());
+            std::cout<< "CURRENT VARS: "<<endl;
+            for (std::pair<std::string, string> element : *method_args) {
+                std::cout << element.first << " with type "<<element.second<< endl;
+            }
+            std::cout<< "About to check method: "<<dis_method<<endl;
+            std::string meth_return = method->type_infer(ss, method_args, dis_class, dis_method);
+            if (meth_return=="Top") {
                 return "Top";
             }
-            (*context)[method->name_.text_] = meth_return;
         }
-        // if everything goes well add the class name to the var table
-        // get what we need from class hierarchy to add return type
-//        ClassNode cn = ss->class_hierarchy[dis_class];
-//        MethodNode mn = cn.constructor_;
-//        std::string should_return = mn.return_type;
-//        (*context)[dis_class] = should_return;
-        return should_return;
+        // TODO anything inherited from the superclass needs to be consistent
+
+        return "Ok";
     }
 
     std::string Call::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method){
@@ -809,9 +794,10 @@ namespace AST {
         std::string method_call = this->method_.get_text();
 
         //look up the method name in the receiver class
-        ClassNode cn = ss->class_hierarchy[receiver];
-        std::cout<< "Got Class Node: "<<cn.name_<< " for receiver "<<this->receiver_.get_text()<<" and type "<<receiver<<endl;
-        MethodNode mn = cn.methods[method_call];
+        ClassNode* cn = &(ss->class_hierarchy[receiver]);
+        std::cout<< "Got Class Node: "<<cn->name_<< " for receiver "<<this->receiver_.get_text()<<" and type "<<receiver<<endl;
+        //TODO in case the method isn't there check count
+        MethodNode mn = cn->methods[method_call];
         std::cout<< "Got Method Node: "<<mn.name<< " for method " << method_call<<endl;
         std::string should_return = mn.return_type;
         std::cout<< "Method Call: "<<method_call<<" Should Return: "<< should_return<<endl;
@@ -837,9 +823,9 @@ namespace AST {
         }
         // all is good, look up the return type in the class hierarchy and return it
         ClassNode cn = ss->class_hierarchy[cur_class];
-        std::cout<< "Got Class Node: "<<cn.name_<< " for construct type "<<cur_method<<endl;
+        //std::cout<< "Got Class Node: "<<cn.name_<< " for construct type "<<cur_method<<endl;
         MethodNode mn = cn.constructor_;
-        std::cout<< "Got Method Node: "<<mn.name<<endl;
+        //std::cout<< "Got Method Node: "<<mn.name<<endl;
         std::string should_return = mn.return_type;
 
         return should_return;
@@ -887,17 +873,19 @@ namespace AST {
     }
 
     std::string Dot::type_infer(StaticSemantics *ss, map<std::string, std::string>* context, string cur_class, string cur_method) {
-        map<std::string, std::string>* temp_args = new map<std::string, std::string>();
-        temp_args->insert(context->begin(), context->end());
         //std::cout<< "IS THIS A THIS "<< this->left_.get_text() <<endl;
-        std::string l_result = this->left_.type_infer(ss, temp_args, cur_class, cur_method);
-        // TODO: what is on the left will affect what is on the right...
-        std::string r_result = this->right_.type_infer(ss, temp_args, l_result, cur_method);
-        if (l_result == "Top" or r_result == "Top") {
-            std::cout<< "Error while Type Inferring Dot" <<endl;
-            return "Top";
+        //get the type of the left (this or other, etc.) then dig that type out of the class hierarchy
+        std::string l_result = this->left_.type_infer(ss, context, cur_class, cur_method);
+        ClassNode* cn = &((ss->class_hierarchy)[l_result]);
+        std::map<std::string, std::string>* cls_table = &(cn->instance_vars);
+        std::cout<< "DOT CURRENT VARS: "<<endl;
+        for (std::pair<std::string, string> element : *cls_table) {
+            std::cout << element.first << " with type "<<element.second<< endl;
         }
-        context->insert(temp_args->begin(), temp_args->end());
+        std::string r_result = this->right_.type_infer(ss, cls_table, l_result, l_result);
+        if (r_result == "Top") {
+            std::cout<< "Error while Type Inferring Dot" <<endl;
+        }
         return r_result;
     }
     void Program::gen_rvalue(CodegenContext& ctx, std::string target_reg) {
@@ -913,12 +901,12 @@ namespace AST {
     }
     void Call::gen_rvalue(CodegenContext &ctx, std::string target_reg) {
         this->receiver_.gen_rvalue(ctx, target_reg);
-        ctx.emit(target_reg +" -> clazz."+ this->method_.text_ + "("+target_reg+")");
+        ctx.emit(target_reg +" -> clazz."+ this->method_.text_ + "("+target_reg+");");
     }
 
     void IntConst::gen_rvalue(CodegenContext &ctx, std::string target_reg) {
         std::string value = to_string(this->value_);
-        ctx.emit(target_reg + " = int_literal(" + value + "); // LOAD constant value");
+        ctx.emit(target_reg + " = (Obj_obj) int_literal(" + value + "); // LOAD constant value");
     }
 
 }

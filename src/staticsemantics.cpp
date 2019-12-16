@@ -31,6 +31,10 @@ public:
 
         return_type = method->returns_.get_text();
         local_vars = map<string, string>();
+        local_vars["True"] = "Boolean";
+        local_vars["False"] = "Boolean";
+        local_vars["true"] = "Boolean";
+        local_vars["false"] = "Boolean";
 
         AST::Formals formals = method->formals_;
         if (formals.elements_.size() != 0) {
@@ -77,8 +81,8 @@ class ClassNode {
             parent = parent;
         }
 
-        void add_method(MethodNode method) {
-            methods[method.name] = method;
+        void add_method(MethodNode* method) {
+            methods[method->name] = *method;
         }
 };
 
@@ -185,14 +189,14 @@ public:
             MethodNode constructor = MethodNode(constr);
             new_class.constructor_ = constructor;
             new_class.instance_vars = new_class.constructor_.local_vars; //constructors variables are the class level - need this?
-            new_class.add_method(constructor);
-
-            vector < AST::Method * > method_list = clazz->methods_.elements_;
-            for (AST::Method *method: method_list) {
-                MethodNode new_method = MethodNode(method);
-                new_class.add_method(new_method);
-                std::cout << "Created method node with name: " << new_method.name << endl;
-            }
+            new_class.add_method(&constructor);
+//
+//            vector < AST::Method * > method_list = clazz->methods_.elements_;
+//            for (AST::Method *method: method_list) {
+//                MethodNode new_method = MethodNode(method);
+//                new_class.add_method(new_method);
+//                std::cout << "Created method node with name: " << new_method.name << endl;
+//            }
 
             std::cout << "Class " << cls_name << " created class node with name: " << new_class.name_ << " and parent " << new_class.parent_ <<"\n" << std::flush;
             class_hierarchy[cls_name] = new_class;
@@ -211,36 +215,39 @@ public:
         MethodNode printmn = MethodNode();
         printmn.name = "PRINT";
         printmn.return_type = "Nothing";
-        (obj_node.methods)["PRINT"] = printmn;
+        map<string, MethodNode>* obj_meths = &(obj_node.methods);
+        (*obj_meths)["PRINT"] = printmn;
         MethodNode strmn = MethodNode();
         strmn.name = "STR";
         strmn.return_type = "String";
-        (obj_node.methods)["STR"] = strmn;
+        (*obj_meths)["STR"] = strmn;
 
         //String Class
         ClassNode string_node = ClassNode("String", "Obj");
         string_node.constructor_.return_type = "String";
         class_hierarchy["String"] = string_node;
-        (string_node.methods)["PRINT"] = printmn;
-        (string_node.methods)["STR"] = strmn;
+        map<string, MethodNode>* string_meths = &(string_node.methods);
+//        (string_node.methods)["PRINT"] = printmn;
+//        (string_node.methods)["STR"] = strmn;
         // String PLUS method (concatenation)
         MethodNode plusmn = MethodNode();
         plusmn.name = "PLUS";
         plusmn.return_type = "String";
-        (string_node.methods)["PLUS"] = plusmn;
+        (*string_meths)["PLUS"] = plusmn;
 
         //Boolean Class
         ClassNode bool_node = ClassNode("Boolean", "Obj");
         bool_node.constructor_.return_type = "Boolean";
         class_hierarchy["Boolean"] = bool_node;
-        (bool_node.methods)["PRINT"] = printmn;
-        (bool_node.methods)["STR"] = strmn;
+//        (bool_node.methods)["PRINT"] = printmn;
+//        (bool_node.methods)["STR"] = strmn;
 
         //Int Class
         ClassNode int_node = ClassNode("Int", "Obj");
         int_node.constructor_.return_type = "Int";
-        (int_node.methods)["PRINT"] = printmn;
-        (int_node.methods)["STR"] = strmn;
+        map<string, MethodNode>* int_meths = &(int_node.methods);
+//        (int_node.methods)["PRINT"] = printmn;
+//        (int_node.methods)["STR"] = strmn;
 
         //Builtin Methods for Ints that return an Int
         vector<string> intreturnvect{ "PLUS", "MINUS", "DIVIDE", "TIMES"};
@@ -248,7 +255,7 @@ public:
             MethodNode mn = MethodNode();
             mn.name = blt;
             mn.return_type = "Int";
-            (int_node.methods)[blt] = mn;
+            (*int_meths)[blt] = mn;
         }
         //Builtin Methods for Ints that return a Boolean
         vector<string> boolreturnvect{ ">", "<", "ATLEAST", "ATMOST", "EQUALS"};
@@ -256,7 +263,7 @@ public:
             MethodNode mn = MethodNode();
             mn.name = blt;
             mn.return_type = "Boolean";
-            (int_node.methods)[blt] = mn;
+            (*int_meths)[blt] = mn;
         }
         class_hierarchy["Int"] = int_node;
 
@@ -273,11 +280,35 @@ public:
             //          << " with parent " << element.second.parent_ << endl;
             topologicalSortRec(cn);
         }
-        int size = sorted_classes.size();
-        std::cout << size << " TOTAL SORTED CLASSES" <<endl;
+
+        //ADD any methods - INHERITED FIRST
         for (int i = 0; i < sorted_classes.size(); i++) {
             std::cout << (sorted_classes.at(i)).name_ << "\n ";
-        } //somehow there are still duplicates - can maybe just remove duplicates or ignore later during type inference/codegen
+            ClassNode* cur_class = &(class_hierarchy[(sorted_classes.at(i).name_)]);
+            if (cur_class->parent_ != "None") {
+                ClassNode* par_node = &(class_hierarchy[cur_class->parent_]);
+                std::map<string, MethodNode>* parentmethods = &(par_node->methods);
+                for (std::pair<string, MethodNode> element: par_node->methods) {
+                    std::cout << "ADDING INHERITED METHOD " << element.first << endl;
+                    MethodNode new_node = MethodNode();
+                    new_node.name = element.second.name;
+                    new_node.return_type = element.second.return_type;
+                    new_node.inherited_from = element.first;
+                    new_node.local_vars = std::map<string, string>(element.second.local_vars);
+                }
+            }
+        }
+//        AST::Classes classes = root_node->classes_;
+//        vector<AST::Class *> class_list = classes.elements_;
+        for (AST::Class *clazz: class_list) {
+            std::cout << "Creating extra methods for class: " << clazz->name_.text_ << endl;
+            vector < AST::Method * > method_list = clazz->methods_.elements_;
+            for (AST::Method *method: method_list) {
+                MethodNode new_method = MethodNode(method);
+                (class_hierarchy[clazz->name_.text_]).add_method(&new_method);
+                std::cout << "Created method node with name: " << new_method.name << endl;
+            }
+        }
     }
 
     void check_init(AST::ASTNode *root) {
@@ -316,27 +347,6 @@ public:
 
     // do type inference per method!!! can reuse this method with statements after class definitions
     void type_inference(AST::ASTNode *root) {
-
-        var_types["Obj"] = "Obj";
-        var_types["PRINT"] = "Nothing";
-        var_types["STR"] = "String";
-        var_types["PLUS"] = "Int";
-        var_types["MINUS"] = "Int";
-        var_types["TIMES"] = "Int";
-        var_types["DIVIDE"] = "Int";
-        var_types["EQUALS"] = "Boolean";
-        var_types["ATMOST"] = "Boolean";
-        var_types["ATLEAST"] = "Boolean";
-        var_types[">"] = "Boolean";
-        var_types["<"] = "Boolean";
-        var_types["Int"] = "Int";
-        var_types["Boolean"] = "Boolean";
-        var_types["String"] = "String";
-        var_types["Nothing"] = "Nothing";
-        var_types["True"] = "Boolean";
-        var_types["False"] = "Boolean";
-        var_types["true"] = "Boolean";
-        var_types["false"] = "Boolean";
 
         AST::Program *root_node = (AST::Program*) root;
 
